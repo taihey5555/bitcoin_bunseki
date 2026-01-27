@@ -69,6 +69,10 @@ def update_gist(data):
     gist_id = os.environ.get('GIST_ID')
     github_token = os.environ.get('GH_TOKEN')
 
+    print(f"DEBUG: GIST_ID = {gist_id}")
+    print(f"DEBUG: GH_TOKEN exists = {bool(github_token)}")
+    print(f"DEBUG: GH_TOKEN length = {len(github_token) if github_token else 0}")
+
     if not gist_id or not github_token:
         print("Error: GIST_ID or GH_TOKEN not set")
         return False
