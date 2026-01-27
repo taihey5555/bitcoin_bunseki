@@ -4,12 +4,6 @@ BTCシグナルダッシュボード用 バックエンドサーバー
 - /api/data エンドポイントで、最新の市場データをJSON形式で提供する
 """
 
-"""
-BTCシグナルダッシュボード用 バックエンドサーバー (非同期版)
-- Flask (async対応) を使用して、ダッシュボードのHTMLを配信する
-- /api/data エンドポイントで、aiohttpを使って並列取得した最新の市場データをJSON形式で提供する
-"""
-
 import asyncio
 import aiohttp
 import json
@@ -24,6 +18,26 @@ import config
 app = Flask(__name__)
 CACHE_FILE = "latest_successful_data.json"
 
+
+async def fetch_all_data():
+    """全データを非同期で並列取得"""
+    async with aiohttp.ClientSession() as session:
+        tasks = [
+            data_provider.get_fred_data(session, "WALCL"),
+            data_provider.get_fred_data(session, "RRPONTSYD"),
+            data_provider.get_fred_data(session, "WTREGEN"),
+            data_provider.get_dxy(session),
+            data_provider.get_exchange_flow(session),
+            data_provider.get_macro_data(session),
+            data_provider.get_btc_price(session),
+            data_provider.get_fear_greed_index(session),
+            data_provider.get_funding_rate(session),
+            data_provider.get_etf_flow(session),
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+    return results
+
+
 @app.route('/')
 def dashboard():
     """ダッシュボードのHTMLページを配信する"""
@@ -31,26 +45,14 @@ def dashboard():
 
 
 @app.route('/api/data')
-async def get_data():
-    """ダッシュボード用のデータを非同期で取得・計算してJSONで返す"""
+def get_data():
+    """ダッシュボード用のデータを取得・計算してJSONで返す"""
     try:
         print("📊 /api/data: データ並列取得・計算開始...")
         start_time = datetime.now()
 
-        async with aiohttp.ClientSession() as session:
-            tasks = [
-                data_provider.get_fred_data(session, "WALCL"),
-                data_provider.get_fred_data(session, "RRPONTSYD"),
-                data_provider.get_fred_data(session, "WTREGEN"),
-                data_provider.get_dxy(session),
-                data_provider.get_exchange_flow(session),
-                data_provider.get_macro_data(session),
-                data_provider.get_btc_price(session),
-                data_provider.get_fear_greed_index(session),
-                data_provider.get_funding_rate(session),
-                data_provider.get_etf_flow(session),
-            ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+        # 非同期処理を同期的に実行
+        results = asyncio.run(fetch_all_data())
 
         # エラーが発生した場合はNoneを設定
         balance_sheet, rrp, tga, dxy, ex_flow, macro_yh, btc, fg, fr, etf_flow = [
@@ -67,8 +69,7 @@ async def get_data():
             liquidity = balance_sheet - (rrp * 1000) - tga
 
         signals = []
-        
-        # (シグナル評価ロジックは変更なし)
+
         sig_liquidity = {"name": "USD流動性", "status": "neutral", "weight": 1, "value": "N/A"}
         if liquidity:
             sig_liquidity["value"] = f"${liquidity/1e6:.2f}T"
@@ -94,12 +95,10 @@ async def get_data():
             elif fg >= config.FEAR_GREED_GREED: sig_fg["status"] = "bearish"
         signals.append(sig_fg)
 
-        sig_flow = {"name": "取引所フロー", "status": "neutral", "weight": 1, "value": "N/A", "inflow": 0, "outflow": 0}
+        sig_flow = {"name": "取引所フロー", "status": "neutral", "weight": 1, "value": "N/A"}
         if ex_flow and ex_flow.get("net_flow") is not None:
             flow = ex_flow["net_flow"]
             sig_flow["value"] = f"{flow:+.0f} BTC"
-            sig_flow["inflow"] = ex_flow.get("inflow", 0)
-            sig_flow["outflow"] = ex_flow.get("outflow", 0)
             if flow > config.EXCHANGE_NET_FLOW_BULLISH_STRONG: sig_flow.update({"status": "bullish", "weight": 2})
             elif flow > config.EXCHANGE_NET_FLOW_BULLISH_WEAK: sig_flow["status"] = "bullish"
             elif flow < config.EXCHANGE_NET_FLOW_BEARISH_STRONG: sig_flow.update({"status": "bearish", "weight": 2})
@@ -112,7 +111,7 @@ async def get_data():
             if fr > config.FUNDING_RATE_OVERHEAT: sig_fr["status"] = "bearish"
             elif fr < config.FUNDING_RATE_COOLING: sig_fr["status"] = "bullish"
         signals.append(sig_fr)
-        
+
         sig_gold = {"name": "Gold", "status": "neutral", "weight": 1, "value": "N/A"}
         if macro_yh and macro_yh.get("gold_change") is not None:
             gc = macro_yh["gold_change"]
@@ -123,11 +122,10 @@ async def get_data():
         sig_etf = {"name": "ETFフロー", "status": "neutral", "weight": 1, "value": "N/A", "details": None}
         if etf_flow:
             if etf_flow.get("status") == "fetching":
-                # バックグラウンド取得中
                 sig_etf["value"] = "取得中..."
                 sig_etf["status"] = "loading"
             elif etf_flow.get("total_daily_flow") is not None:
-                flow = etf_flow["total_daily_flow"]  # 百万USD単位
+                flow = etf_flow["total_daily_flow"]
                 sig_etf["value"] = f"{flow:+.1f}M USD"
                 sig_etf["details"] = {
                     "date": etf_flow.get("date", ""),
@@ -156,17 +154,13 @@ async def get_data():
         elif score < -10: summary_text = "やや弱気の環境。下落リスクに注意し、ポジション調整も視野に。"
 
         response_data = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M JST"),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
             "btcPrice": btc.get("usd", 0),
             "score": round(score),
             "summary": {"title": "💡 分析サマリー", "text": summary_text},
             "signals": signals,
             "is_fallback": False
         }
-        
-        # 成功したデータをキャッシュファイルに保存
-        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(response_data, f, ensure_ascii=False, indent=2)
 
         duration = (datetime.now() - start_time).total_seconds()
         print(f"✅ /api/data: 計算完了 (処理時間: {duration:.2f}秒)")
@@ -174,28 +168,23 @@ async def get_data():
 
     except Exception as e:
         print(f"❌ /api/data: データ取得・計算中にエラー発生: {e}")
-        try:
-            # エラーが発生した場合、キャッシュされたデータを読み込む
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                fallback_data = json.load(f)
-            fallback_data["is_fallback"] = True
-            fallback_data["summary"]["title"] = "⚠️ 前回データを表示中"
-            print(f"↪️ フォールバックデータを返します: {fallback_data['timestamp']}")
-            return jsonify(fallback_data)
-        except Exception as cache_error:
-            # キャッシュファイルも存在しない場合
-            print(f"❌ キャッシュファイルの読み込みにも失敗: {cache_error}")
-            return jsonify({"error": "最新データの取得に失敗し、フォールバックデータもありません。"}), 500
+        # エラー時はデフォルトレスポンスを返す
+        return jsonify({
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
+            "btcPrice": 0,
+            "score": 0,
+            "summary": {"title": "⚠️ エラー", "text": "データの取得に失敗しました。しばらく待ってから再度お試しください。"},
+            "signals": [],
+            "is_fallback": True,
+            "error": str(e)
+        }), 500
 
 
 if __name__ == '__main__':
     if config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE":
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print("!!! config.pyにFREDのAPIキーを設定してください。     !!!")
+        print("!!! 環境変数FRED_API_KEYを設定してください。          !!!")
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     else:
-        if config.ETF_GIST_URL == "YOUR_GIST_RAW_URL_HERE":
-            print("⚠️ ETF_GIST_URLが未設定です。ETFフローは表示されません。")
-        else:
-            print("📊 ETFフローはGitHub Gistから取得します")
+        print("📊 BTCシグナルダッシュボード起動中...")
         app.run(debug=True, host='0.0.0.0', port=5000)
