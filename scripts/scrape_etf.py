@@ -11,15 +11,21 @@ from datetime import datetime
 
 def scrape_etf_flow():
     """SeleniumBaseでCoinGlassからETFフローをスクレイピング"""
-    from seleniumbase import SB
+    try:
+        from seleniumbase import SB
 
-    with SB(uc=True, headless=True) as sb:
-        sb.open('https://www.coinglass.com/ja/etf/bitcoin')
-        sb.sleep(12)
+        with SB(uc=True, headless=True) as sb:
+            print("Opening CoinGlass page...")
+            sb.open('https://www.coinglass.com/ja/etf/bitcoin')
+            sb.sleep(12)
 
-        rows = sb.find_elements('css selector', 'table tr')
-        if len(rows) < 3:
-            return None
+            print("Finding table rows...")
+            rows = sb.find_elements('css selector', 'table tr')
+            print(f"Found {len(rows)} rows")
+
+            if len(rows) < 3:
+                print("Not enough rows found")
+                return None
 
         # 最新の日付行を探す
         latest_row = None
@@ -62,6 +68,11 @@ def scrape_etf_flow():
             "top_flows": sorted(etf_flows, key=lambda x: abs(x["daily_flow"]), reverse=True)[:5],
             "updated_at": datetime.now().isoformat()
         }
+    except Exception as e:
+        print(f"Scraping error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 def update_gist(data):
