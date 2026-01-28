@@ -18,6 +18,10 @@ import config
 app = Flask(__name__)
 CACHE_FILE = "latest_successful_data.json"
 
+# 起動時のデバッグログ
+print(f"🔑 FRED_API_KEY: {'設定済み (' + config.FRED_API_KEY[:4] + '...)' if config.FRED_API_KEY and config.FRED_API_KEY != 'YOUR_FRED_API_KEY_HERE' else '未設定'}")
+print(f"🔑 ETF_GIST_URL: {'設定済み' if config.ETF_GIST_URL else '未設定'}")
+
 
 async def fetch_all_data():
     """全データを非同期で並列取得"""
@@ -181,6 +185,9 @@ def get_data():
 
 
 if __name__ == '__main__':
+    print(f"🔑 FRED_API_KEY: {'設定済み (' + config.FRED_API_KEY[:4] + '...)' if config.FRED_API_KEY and config.FRED_API_KEY != 'YOUR_FRED_API_KEY_HERE' else '未設定'}")
+    print(f"🔑 ETF_GIST_URL: {'設定済み' if config.ETF_GIST_URL else '未設定'}")
+
     if config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE":
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         print("!!! 環境変数FRED_API_KEYを設定してください。          !!!")

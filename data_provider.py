@@ -37,6 +37,12 @@ async def _request_handler(session: aiohttp.ClientSession, url: str, params: Dic
 async def get_fred_data(session: aiohttp.ClientSession, series_id: str, target_date: Optional[datetime] = None) -> Optional[float]:
     """FREDからデータを取得。休日等を考慮し、指定日から最大5日前まで遡って探す。"""
     url = "https://api.stlouisfed.org/fred/series/observations"
+
+    # APIキー確認
+    if not config.FRED_API_KEY or config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE":
+        print(f"⚠️ FRED APIキーが設定されていません")
+        return None
+
     for i in range(5):
         date_to_fetch = (target_date if target_date else datetime.now()) - timedelta(days=i)
         date_str = date_to_fetch.strftime('%Y-%m-%d')
@@ -155,7 +161,20 @@ async def get_funding_rate(session: aiohttp.ClientSession, target_date: Optional
         print("⚠️ ファンディングレートの過去データは取得できません。")
         return None
 
-    # Binance APIを試す
+    # Bybit API（地域制限なし）
+    try:
+        url = "https://api.bybit.com/v5/market/tickers"
+        params = {"category": "linear", "symbol": "BTCUSDT"}
+        data = await _request_handler(session, url, params=params)
+        if data and data.get("result", {}).get("list"):
+            rate = data["result"]["list"][0].get("fundingRate")
+            if rate:
+                print(f"📡 Funding Rate (Bybit): {float(rate) * 100:.4f}%")
+                return float(rate) * 100
+    except Exception as e:
+        print(f"⚠️ Bybit Funding Rate取得失敗: {e}")
+
+    # フォールバック: Binance
     try:
         url = "https://fapi.binance.com/fapi/v1/fundingRate"
         params = {"symbol": "BTCUSDT", "limit": 1}
@@ -164,19 +183,6 @@ async def get_funding_rate(session: aiohttp.ClientSession, target_date: Optional
             return float(data[0]["fundingRate"]) * 100
     except Exception as e:
         print(f"⚠️ Binance Funding Rate取得失敗: {e}")
-
-    # フォールバック: CoinGlass公開API
-    try:
-        url = "https://open-api.coinglass.com/public/v2/funding"
-        params = {"symbol": "BTC", "time_type": "all"}
-        data = await _request_handler(session, url, params=params)
-        if data and data.get("data"):
-            # 最初のデータ（通常はBinance）を取得
-            rate = data["data"][0].get("rate")
-            if rate:
-                return float(rate) * 100
-    except Exception as e:
-        print(f"⚠️ CoinGlass Funding Rate取得失敗: {e}")
 
     return None
 
