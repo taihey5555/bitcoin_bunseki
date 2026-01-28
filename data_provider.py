@@ -35,29 +35,39 @@ async def _request_handler(session: aiohttp.ClientSession, url: str, params: Dic
         raise DataProviderError(f"リクエストエラー ({url}): {e}") from e
 
 async def get_fred_data(session: aiohttp.ClientSession, series_id: str, target_date: Optional[datetime] = None) -> Optional[float]:
-    """FREDからデータを取得。休日等を考慮し、指定日から最大5日前まで遡って探す。"""
+    """FREDからデータを取得。最新データを取得（直近30日間）"""
     url = "https://api.stlouisfed.org/fred/series/observations"
 
     # APIキー確認
     if not config.FRED_API_KEY or config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE":
-        print(f"⚠️ FRED APIキーが設定されていません")
+        print(f"⚠️ FRED APIキーが設定されていません (現在値: {config.FRED_API_KEY[:8] if config.FRED_API_KEY else 'None'}...)")
         return None
 
-    for i in range(5):
-        date_to_fetch = (target_date if target_date else datetime.now()) - timedelta(days=i)
-        date_str = date_to_fetch.strftime('%Y-%m-%d')
-        params = {
-            "series_id": series_id, "api_key": config.FRED_API_KEY, "file_type": "json",
-            "observation_start": date_str, "observation_end": date_str
-        }
-        try:
-            data = await _request_handler(session, url, params=params)
-            if data and data.get("observations"):
-                value = data["observations"][0]["value"]
-                return float(value) if value != "." else None
-        except DataProviderError:
-            continue # データがなければ次の日へ
-    print(f"⚠️ FRED取得失敗 ({series_id}): 5日間データが見つかりませんでした。")
+    # 最新データを取得（過去30日間で最新のものを取得）
+    end_date = target_date if target_date else datetime.now()
+    start_date = end_date - timedelta(days=30)
+
+    params = {
+        "series_id": series_id,
+        "api_key": config.FRED_API_KEY,
+        "file_type": "json",
+        "observation_start": start_date.strftime('%Y-%m-%d'),
+        "observation_end": end_date.strftime('%Y-%m-%d'),
+        "sort_order": "desc",
+        "limit": 1
+    }
+
+    try:
+        data = await _request_handler(session, url, params=params)
+        if data and data.get("observations") and len(data["observations"]) > 0:
+            value = data["observations"][0]["value"]
+            if value != ".":
+                print(f"📡 FRED ({series_id}): {float(value):,.0f}")
+                return float(value)
+    except DataProviderError as e:
+        print(f"⚠️ FRED取得失敗 ({series_id}): {e}")
+
+    print(f"⚠️ FRED取得失敗 ({series_id}): データが見つかりませんでした。")
     return None
 
 async def get_btc_price(session: aiohttp.ClientSession, target_date: Optional[datetime] = None) -> Dict:
@@ -161,28 +171,30 @@ async def get_funding_rate(session: aiohttp.ClientSession, target_date: Optional
         print("⚠️ ファンディングレートの過去データは取得できません。")
         return None
 
-    # Bybit API（地域制限なし）
+    # OKX API
     try:
-        url = "https://api.bybit.com/v5/market/tickers"
-        params = {"category": "linear", "symbol": "BTCUSDT"}
+        url = "https://www.okx.com/api/v5/public/funding-rate"
+        params = {"instId": "BTC-USDT-SWAP"}
         data = await _request_handler(session, url, params=params)
-        if data and data.get("result", {}).get("list"):
-            rate = data["result"]["list"][0].get("fundingRate")
+        if data and data.get("data"):
+            rate = data["data"][0].get("fundingRate")
             if rate:
-                print(f"📡 Funding Rate (Bybit): {float(rate) * 100:.4f}%")
+                print(f"📡 Funding Rate (OKX): {float(rate) * 100:.4f}%")
                 return float(rate) * 100
     except Exception as e:
-        print(f"⚠️ Bybit Funding Rate取得失敗: {e}")
+        print(f"⚠️ OKX Funding Rate取得失敗: {e}")
 
-    # フォールバック: Binance
+    # フォールバック: dYdX (分散型、制限なし)
     try:
-        url = "https://fapi.binance.com/fapi/v1/fundingRate"
-        params = {"symbol": "BTCUSDT", "limit": 1}
-        data = await _request_handler(session, url, params=params)
-        if data:
-            return float(data[0]["fundingRate"]) * 100
+        url = "https://indexer.dydx.trade/v4/perpetualMarkets"
+        data = await _request_handler(session, url)
+        if data and data.get("markets", {}).get("BTC-USD"):
+            rate = data["markets"]["BTC-USD"].get("nextFundingRate")
+            if rate:
+                print(f"📡 Funding Rate (dYdX): {float(rate) * 100:.4f}%")
+                return float(rate) * 100
     except Exception as e:
-        print(f"⚠️ Binance Funding Rate取得失敗: {e}")
+        print(f"⚠️ dYdX Funding Rate取得失敗: {e}")
 
     return None
 
