@@ -55,89 +55,196 @@ def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
     FRBが直接的なQEを行わずに、日本市場を経由して
     ドル流動性を供給している兆候を検出
 
-    判定条件:
-    1. Total Assets（WALCL）が前週比で増加
-    2. Treasury Holdings（TREAST）が横ばいまたは減少（国内QE非活発）
-    3. Central Bank Swaps（SWPT）が前週比10%以上急増
-    4. USDJPYが前週比1%以上上昇（円安方向）
+    判定条件（すべて前週比）:
+    1. Total Assets（WALCL）> +0.1% → FRB資産拡大中
+    2. Treasury Holdings（TREAST）< +0.5% → 国内QE非活発
+    3. Central Bank Swaps（SWPT）>= +10% → 海外へのドル供給急増
+    4. USDJPY >= +1% → 円安進行（ドル需要増）
+
+    判定結果:
+    - 4条件成立: ON（強気シグナル）
+    - 2-3条件成立: WATCH（注視）
+    - 0-1条件成立: OFF（シグナルなし）
 
     Returns:
         {
             "signal": "OFF" | "WATCH" | "ON",
             "score": 0-4,
             "details": {...},
-            "explanation": "..."
+            "explanation": "...",
+            "thresholds": {...},
+            "updated_at": "..."
         }
     """
     score = 0
-    details = {
-        "total_assets": {"status": "N/A", "value": None, "change": None},
-        "treasury": {"status": "N/A", "value": None, "change": None},
-        "swaps": {"status": "N/A", "value": None, "change": None},
-        "usdjpy": {"status": "N/A", "value": None, "change": None},
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
+
+    # 閾値情報（フロントエンド表示用）
+    thresholds = {
+        "total_assets": f"> +{config.TOTAL_ASSETS_INCREASE_THRESHOLD}%",
+        "treasury": f"< +{config.TREASURY_HOLDINGS_INCREASE_THRESHOLD}%",
+        "swaps": f">= +{config.SWAPS_SURGE_THRESHOLD}%",
+        "usdjpy": f">= +{config.USDJPY_WEAKENING_THRESHOLD}%"
     }
 
-    # 条件1: Total Assets が増加
+    # 各条件の詳細情報を初期化
+    details = {
+        "total_assets": {
+            "status": "データ取得失敗",
+            "value": None,
+            "change": None,
+            "threshold": config.TOTAL_ASSETS_INCREASE_THRESHOLD,
+            "met": False,
+            "reason": "FREDからデータを取得できませんでした"
+        },
+        "treasury": {
+            "status": "データ取得失敗",
+            "value": None,
+            "change": None,
+            "threshold": config.TREASURY_HOLDINGS_INCREASE_THRESHOLD,
+            "met": False,
+            "reason": "FREDからデータを取得できませんでした"
+        },
+        "swaps": {
+            "status": "データ取得失敗",
+            "value": None,
+            "change": None,
+            "threshold": config.SWAPS_SURGE_THRESHOLD,
+            "met": False,
+            "reason": "FREDからデータを取得できませんでした"
+        },
+        "usdjpy": {
+            "status": "データ取得失敗",
+            "value": None,
+            "change": None,
+            "threshold": config.USDJPY_WEAKENING_THRESHOLD,
+            "met": False,
+            "reason": "Yahoo Financeからデータを取得できませんでした"
+        },
+    }
+
+    # 条件1: Total Assets（WALCL）が前週比で増加
+    # 判定: change > 0.1% で「FRB資産拡大中」
     if walcl_data and walcl_data.get("change") is not None:
         change = walcl_data["change"]
+        threshold = config.TOTAL_ASSETS_INCREASE_THRESHOLD
+        met = change > threshold
+
+        if met:
+            score += 1
+            reason = f"前週比 {change:+.2f}% > {threshold}% → FRB資産拡大中"
+            status = "増加"
+        else:
+            reason = f"前週比 {change:+.2f}% <= {threshold}% → 資産横ばい/減少"
+            status = "横ばい/減少"
+
         details["total_assets"] = {
+            "status": status,
             "value": walcl_data["value"],
             "change": change,
-            "status": "増加" if change > config.TOTAL_ASSETS_INCREASE_THRESHOLD else "横ばい/減少"
+            "threshold": threshold,
+            "met": met,
+            "reason": reason,
+            "date": walcl_data.get("date")
         }
-        if change > config.TOTAL_ASSETS_INCREASE_THRESHOLD:
-            score += 1
 
-    # 条件2: Treasury Holdings が横ばいまたは減少（国内QE非活発）
+    # 条件2: Treasury Holdings（TREAST）が横ばいまたは減少
+    # 判定: change < 0.5% で「国内QE非活発」（=隠れQEの条件成立）
     if treast_data and treast_data.get("change") is not None:
         change = treast_data["change"]
+        threshold = config.TREASURY_HOLDINGS_INCREASE_THRESHOLD
+        met = change < threshold
+
+        if met:
+            score += 1
+            reason = f"前週比 {change:+.2f}% < {threshold}% → 国内QE非活発"
+            status = "非活発"
+        else:
+            reason = f"前週比 {change:+.2f}% >= {threshold}% → 国内QE活発"
+            status = "活発"
+
         details["treasury"] = {
+            "status": status,
             "value": treast_data["value"],
             "change": change,
-            "status": "非活発" if change < config.TREASURY_HOLDINGS_INCREASE_THRESHOLD else "活発"
+            "threshold": threshold,
+            "met": met,
+            "reason": reason,
+            "date": treast_data.get("date")
         }
-        # 国内QEが目立たない = Treasury増加が閾値以下
-        if change < config.TREASURY_HOLDINGS_INCREASE_THRESHOLD:
-            score += 1
 
-    # 条件3: Central Bank Swaps が急増
+    # 条件3: Central Bank Swaps（SWPT）が急増
+    # 判定: change >= 10% で「海外へのドル供給急増」
     if swpt_data and swpt_data.get("change") is not None:
         change = swpt_data["change"]
+        threshold = config.SWAPS_SURGE_THRESHOLD
+        met = change >= threshold
+
+        if met:
+            score += 1
+            reason = f"前週比 {change:+.2f}% >= {threshold}% → ドル供給急増"
+            status = "急増"
+        else:
+            reason = f"前週比 {change:+.2f}% < {threshold}% → 通常レベル"
+            status = "通常"
+
         details["swaps"] = {
+            "status": status,
             "value": swpt_data["value"],
             "change": change,
-            "status": "急増" if change >= config.SWAPS_SURGE_THRESHOLD else "通常"
+            "threshold": threshold,
+            "met": met,
+            "reason": reason,
+            "date": swpt_data.get("date")
         }
-        if change >= config.SWAPS_SURGE_THRESHOLD:
-            score += 1
 
     # 条件4: USDJPY が円安方向
+    # 判定: change >= 1% で「円安進行」
     if usdjpy_data and usdjpy_data.get("change") is not None:
         change = usdjpy_data["change"]
+        threshold = config.USDJPY_WEAKENING_THRESHOLD
+        met = change >= threshold
+
+        if met:
+            score += 1
+            reason = f"週次変化 {change:+.2f}% >= {threshold}% → 円安進行中"
+            status = "円安進行"
+        else:
+            if change <= -threshold:
+                reason = f"週次変化 {change:+.2f}% → 円高進行中"
+                status = "円高進行"
+            else:
+                reason = f"週次変化 {change:+.2f}% → 安定推移"
+                status = "安定"
+
         details["usdjpy"] = {
+            "status": status,
             "value": usdjpy_data["value"],
             "change": change,
-            "status": "円安進行" if change >= config.USDJPY_WEAKENING_THRESHOLD else "安定/円高"
+            "threshold": threshold,
+            "met": met,
+            "reason": reason
         }
-        if change >= config.USDJPY_WEAKENING_THRESHOLD:
-            score += 1
 
-    # シグナル判定
-    if score >= config.HIDDEN_QE_SIGNAL_ON:
+    # シグナル判定（スコアに基づく3段階判定）
+    if score >= config.HIDDEN_QE_SIGNAL_ON:  # 4点
         signal = "ON"
-        explanation = "全条件成立。日本経由の隠れQEが活発化している可能性が高い。BTCに強気シグナル。"
-    elif score >= config.HIDDEN_QE_SIGNAL_WATCH:
+        explanation = "全4条件成立。日本経由の隠れQEが活発化している可能性が高い。BTCに強気シグナル。"
+    elif score >= config.HIDDEN_QE_SIGNAL_WATCH:  # 2-3点
         signal = "WATCH"
-        explanation = f"{score}/4条件成立。隠れQEの兆候あり。動向を注視。"
-    else:
+        met_conditions = [k for k, v in details.items() if v.get("met")]
+        explanation = f"{score}/4条件成立（{', '.join(met_conditions)}）。隠れQEの兆候あり。動向を注視。"
+    else:  # 0-1点
         signal = "OFF"
-        explanation = "条件未成立。現時点で隠れQEの明確な兆候なし。"
+        explanation = f"{score}/4条件のみ成立。現時点で隠れQEの明確な兆候なし。"
 
     return {
         "signal": signal,
         "score": score,
         "details": details,
-        "explanation": explanation
+        "explanation": explanation,
+        "thresholds": thresholds,
+        "updated_at": updated_at
     }
 
 

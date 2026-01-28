@@ -111,6 +111,15 @@
             color: #888;
             font-size: 14px;
         }
+        .update-time {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+        }
 
         /* カード */
         .card {
@@ -137,7 +146,7 @@
             padding: 30px;
             background: rgba(255, 255, 255, 0.03);
             border-radius: 16px;
-            margin-bottom: 25px;
+            margin-bottom: 15px;
         }
         .signal-badge {
             padding: 12px 30px;
@@ -164,9 +173,19 @@
             box-shadow: 0 0 30px rgba(46, 213, 115, 0.4);
             animation: pulse-glow 2s ease-in-out infinite;
         }
+        .signal-badge.loading {
+            background: rgba(79, 172, 254, 0.2);
+            color: #4facfe;
+            border: 2px solid #4facfe;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
         @keyframes pulse-glow {
             0%, 100% { box-shadow: 0 0 20px rgba(46, 213, 115, 0.3); }
             50% { box-shadow: 0 0 40px rgba(46, 213, 115, 0.6); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         .signal-score {
             font-size: 18px;
@@ -178,46 +197,107 @@
             font-size: 14px;
             margin-top: 15px;
             line-height: 1.6;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
         }
 
         /* 条件チェックリスト */
         .condition-list {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         .condition-item {
-            display: flex;
-            align-items: center;
-            padding: 15px;
+            padding: 18px;
             background: rgba(255, 255, 255, 0.03);
-            border-radius: 10px;
-            border-left: 3px solid #666;
+            border-radius: 12px;
+            border-left: 4px solid #666;
+            transition: all 0.3s ease;
         }
         .condition-item.met {
             border-left-color: #2ed573;
-            background: rgba(46, 213, 115, 0.1);
+            background: rgba(46, 213, 115, 0.08);
         }
         .condition-item.not-met {
             border-left-color: #ff4757;
+            background: rgba(255, 71, 87, 0.05);
+        }
+        .condition-item.loading {
+            border-left-color: #4facfe;
+        }
+        .condition-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
         }
         .condition-icon {
-            font-size: 18px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
             margin-right: 12px;
         }
-        .condition-text {
-            flex: 1;
+        .condition-item.met .condition-icon {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+        }
+        .condition-item.not-met .condition-icon {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+        }
+        .condition-item.loading .condition-icon {
+            background: rgba(79, 172, 254, 0.2);
+            color: #4facfe;
         }
         .condition-name {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
             color: #fff;
-            margin-bottom: 3px;
         }
-        .condition-value {
+        .condition-details {
+            margin-left: 40px;
+        }
+        .condition-current {
+            font-size: 13px;
+            color: #ccc;
+            margin-bottom: 4px;
+        }
+        .condition-threshold {
             font-size: 12px;
             color: #888;
+            margin-bottom: 6px;
+        }
+        .condition-reason {
+            font-size: 11px;
+            color: #666;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* 判定ロジック説明 */
+        .logic-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        .logic-item {
+            font-size: 12px;
+            color: #888;
+        }
+        .logic-item strong {
+            color: #f7931a;
         }
 
         /* 現在値表示 */
@@ -243,12 +323,21 @@
             font-weight: 700;
             color: #f7931a;
         }
+        .value-box .value.loading {
+            color: #4facfe;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
         .value-box .change {
             font-size: 12px;
             margin-top: 5px;
         }
         .value-box .change.positive { color: #2ed573; }
         .value-box .change.negative { color: #ff4757; }
+        .value-box .date {
+            font-size: 10px;
+            color: #555;
+            margin-top: 4px;
+        }
 
         /* チャート */
         .chart-container {
@@ -287,7 +376,7 @@
             color: #ffd93d;
         }
 
-        .loading {
+        .loading-text {
             text-align: center;
             padding: 50px;
             color: #888;
@@ -315,6 +404,32 @@
             text-align: right;
         }
 
+        /* 判定基準テーブル */
+        .criteria-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+        .criteria-table th, .criteria-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .criteria-table th {
+            color: #f7931a;
+            font-weight: 600;
+        }
+        .criteria-table td {
+            color: #aaa;
+        }
+        .criteria-table code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #ffd93d;
+        }
+
         /* レスポンシブ */
         @media (max-width: 768px) {
             .navbar-menu { display: none; }
@@ -339,6 +454,7 @@
             .value-box .label { font-size: 10px; }
             .value-box .value { font-size: 14px; }
             .chart-container { height: 250px; }
+            .condition-details { margin-left: 0; margin-top: 10px; }
         }
     </style>
 </head>
@@ -368,51 +484,78 @@
     <div class="page-content">
         <div class="page-header">
             <h1>海外流動性 / 隠れQE検出</h1>
-            <p>FRBが日本市場を使って隠れた量的緩和を行っている兆候を検出</p>
+            <p>Arthur Hayes "Japanese QE Thesis" - FRBが日本市場を使って隠れた量的緩和を行っている兆候を検出</p>
+            <div class="update-time" id="update-time">最終更新: 読み込み中...</div>
         </div>
 
         <!-- シグナル表示 -->
         <div class="card">
             <div class="card-title">隠れQEシグナル</div>
             <div class="signal-display">
-                <div id="signal-badge" class="signal-badge off">OFF</div>
-                <div id="signal-score" class="signal-score">0/4 条件成立</div>
+                <div id="signal-badge" class="signal-badge loading">...</div>
+                <div id="signal-score" class="signal-score">読み込み中...</div>
             </div>
-            <div id="signal-explanation" class="signal-explanation">データを読み込み中...</div>
+            <div id="signal-explanation" class="signal-explanation">データを取得しています。しばらくお待ちください...</div>
         </div>
 
         <!-- 条件チェックリスト -->
         <div class="card">
-            <div class="card-title">判定条件チェック</div>
+            <div class="card-title">判定条件チェック（4条件）</div>
             <div class="condition-list" id="condition-list">
-                <div class="condition-item" id="cond-total-assets">
-                    <div class="condition-icon">-</div>
-                    <div class="condition-text">
+                <!-- 条件1: Total Assets -->
+                <div class="condition-item loading" id="cond-total-assets">
+                    <div class="condition-header">
+                        <div class="condition-icon">...</div>
                         <div class="condition-name">Total Assets 増加</div>
-                        <div class="condition-value" id="cond-total-assets-value">--</div>
+                    </div>
+                    <div class="condition-details">
+                        <div class="condition-current" id="cond-total-assets-current">現在値: 読み込み中...</div>
+                        <div class="condition-threshold" id="cond-total-assets-threshold">閾値: 前週比 > +0.1%</div>
+                        <div class="condition-reason" id="cond-total-assets-reason">判定理由: 読み込み中...</div>
                     </div>
                 </div>
-                <div class="condition-item" id="cond-treasury">
-                    <div class="condition-icon">-</div>
-                    <div class="condition-text">
+                <!-- 条件2: Treasury -->
+                <div class="condition-item loading" id="cond-treasury">
+                    <div class="condition-header">
+                        <div class="condition-icon">...</div>
                         <div class="condition-name">国内QE非活発</div>
-                        <div class="condition-value" id="cond-treasury-value">--</div>
+                    </div>
+                    <div class="condition-details">
+                        <div class="condition-current" id="cond-treasury-current">現在値: 読み込み中...</div>
+                        <div class="condition-threshold" id="cond-treasury-threshold">閾値: 前週比 < +0.5%</div>
+                        <div class="condition-reason" id="cond-treasury-reason">判定理由: 読み込み中...</div>
                     </div>
                 </div>
-                <div class="condition-item" id="cond-swaps">
-                    <div class="condition-icon">-</div>
-                    <div class="condition-text">
+                <!-- 条件3: Swaps -->
+                <div class="condition-item loading" id="cond-swaps">
+                    <div class="condition-header">
+                        <div class="condition-icon">...</div>
                         <div class="condition-name">Central Bank Swaps 急増</div>
-                        <div class="condition-value" id="cond-swaps-value">--</div>
+                    </div>
+                    <div class="condition-details">
+                        <div class="condition-current" id="cond-swaps-current">現在値: 読み込み中...</div>
+                        <div class="condition-threshold" id="cond-swaps-threshold">閾値: 前週比 >= +10%</div>
+                        <div class="condition-reason" id="cond-swaps-reason">判定理由: 読み込み中...</div>
                     </div>
                 </div>
-                <div class="condition-item" id="cond-usdjpy">
-                    <div class="condition-icon">-</div>
-                    <div class="condition-text">
+                <!-- 条件4: USDJPY -->
+                <div class="condition-item loading" id="cond-usdjpy">
+                    <div class="condition-header">
+                        <div class="condition-icon">...</div>
                         <div class="condition-name">USDJPY 円安進行</div>
-                        <div class="condition-value" id="cond-usdjpy-value">--</div>
+                    </div>
+                    <div class="condition-details">
+                        <div class="condition-current" id="cond-usdjpy-current">現在値: 読み込み中...</div>
+                        <div class="condition-threshold" id="cond-usdjpy-threshold">閾値: 週次変化 >= +1%</div>
+                        <div class="condition-reason" id="cond-usdjpy-reason">判定理由: 読み込み中...</div>
                     </div>
                 </div>
+            </div>
+
+            <div class="logic-summary">
+                <div class="logic-item"><strong>OFF</strong>: 0-1条件成立 (シグナルなし)</div>
+                <div class="logic-item"><strong>WATCH</strong>: 2-3条件成立 (注視)</div>
+                <div class="logic-item"><strong>ON</strong>: 4条件成立 (BTC強気)</div>
             </div>
         </div>
 
@@ -422,23 +565,27 @@
             <div class="current-values">
                 <div class="value-box">
                     <div class="label">Total Assets (WALCL)</div>
-                    <div class="value" id="walcl-value">--</div>
+                    <div class="value loading" id="walcl-value">...</div>
                     <div class="change" id="walcl-change">--</div>
+                    <div class="date" id="walcl-date">--</div>
                 </div>
                 <div class="value-box">
                     <div class="label">Treasury Holdings (TREAST)</div>
-                    <div class="value" id="treast-value">--</div>
+                    <div class="value loading" id="treast-value">...</div>
                     <div class="change" id="treast-change">--</div>
+                    <div class="date" id="treast-date">--</div>
                 </div>
                 <div class="value-box">
                     <div class="label">Central Bank Swaps (SWPT)</div>
-                    <div class="value" id="swpt-value">--</div>
+                    <div class="value loading" id="swpt-value">...</div>
                     <div class="change" id="swpt-change">--</div>
+                    <div class="date" id="swpt-date">--</div>
                 </div>
                 <div class="value-box">
                     <div class="label">USDJPY</div>
-                    <div class="value" id="usdjpy-value">--</div>
+                    <div class="value loading" id="usdjpy-value">...</div>
                     <div class="change" id="usdjpy-change">--</div>
+                    <div class="date" id="usdjpy-date">リアルタイム</div>
                 </div>
             </div>
         </div>
@@ -449,7 +596,7 @@
             <div class="chart-container">
                 <canvas id="swapsChart"></canvas>
             </div>
-            <div id="chartLoading" class="loading">チャートデータを読み込み中...</div>
+            <div id="chartLoading" class="loading-text">チャートデータを読み込み中...</div>
         </div>
 
         <!-- 説明 -->
@@ -462,13 +609,44 @@
                 </div>
                 <p><strong>背景:</strong> FRBは公式にはQT（量的引き締め）を継続中ですが、日銀との通貨スワップを通じて、実質的なドル供給を行っている可能性があります。</p>
                 <p><strong>メカニズム:</strong></p>
-                <p>1. FRBが日銀にドルを供給（Central Bank Swaps増加）</p>
+                <p>1. FRBが日銀にドルを供給 → Central Bank Swaps（SWPT）増加</p>
                 <p>2. 日銀がそのドルで為替介入（円買い・ドル売り）</p>
                 <p>3. しかし介入後もドルは金融システム内に残留</p>
                 <p>4. 結果として、リスク資産（BTC含む）に追い風</p>
-                <p><strong>判定条件:</strong></p>
-                <p><code>Total Assets増加</code> + <code>国内QE非活発</code> + <code>Swaps急増</code> + <code>円安進行</code></p>
-                <p>4条件全て成立で <strong>ON</strong>、2-3条件で <strong>WATCH</strong>、0-1条件で <strong>OFF</strong></p>
+
+                <h3 style="margin-top: 20px;">判定基準</h3>
+                <table class="criteria-table">
+                    <tr>
+                        <th>条件</th>
+                        <th>指標</th>
+                        <th>閾値</th>
+                        <th>意味</th>
+                    </tr>
+                    <tr>
+                        <td>Total Assets 増加</td>
+                        <td>WALCL 前週比</td>
+                        <td><code>> +0.1%</code></td>
+                        <td>FRB資産が拡大中</td>
+                    </tr>
+                    <tr>
+                        <td>国内QE非活発</td>
+                        <td>TREAST 前週比</td>
+                        <td><code>< +0.5%</code></td>
+                        <td>国債買入が目立たない</td>
+                    </tr>
+                    <tr>
+                        <td>Swaps急増</td>
+                        <td>SWPT 前週比</td>
+                        <td><code>>= +10%</code></td>
+                        <td>海外へのドル供給急増</td>
+                    </tr>
+                    <tr>
+                        <td>円安進行</td>
+                        <td>USDJPY 週次変化</td>
+                        <td><code>>= +1%</code></td>
+                        <td>ドル需要増の兆候</td>
+                    </tr>
+                </table>
             </div>
         </div>
     </div>
@@ -481,6 +659,85 @@
 
         let chart = null;
 
+        // 条件を更新する関数
+        function updateCondition(condId, data) {
+            const element = document.getElementById(condId);
+            const iconElement = element.querySelector('.condition-icon');
+            const currentElement = document.getElementById(condId + '-current');
+            const thresholdElement = document.getElementById(condId + '-threshold');
+            const reasonElement = document.getElementById(condId + '-reason');
+
+            // データがない場合
+            if (!data || data.value === null) {
+                element.className = 'condition-item not-met';
+                iconElement.textContent = '!';
+                currentElement.textContent = '現在値: データ取得失敗';
+                reasonElement.textContent = data?.reason || 'データを取得できませんでした';
+                return;
+            }
+
+            // 条件成立/不成立に応じてスタイルを変更
+            const met = data.met;
+            element.className = 'condition-item ' + (met ? 'met' : 'not-met');
+            iconElement.textContent = met ? '✓' : '✗';
+
+            // 現在値表示
+            let currentText = '';
+            if (condId === 'cond-usdjpy') {
+                currentText = `現在値: ${data.value?.toFixed(2)} (週次 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%)`;
+            } else {
+                currentText = `現在値: 前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+            }
+            currentElement.textContent = currentText;
+
+            // 閾値表示
+            let thresholdText = '';
+            switch(condId) {
+                case 'cond-total-assets':
+                    thresholdText = `閾値: 前週比 > +${data.threshold}%`;
+                    break;
+                case 'cond-treasury':
+                    thresholdText = `閾値: 前週比 < +${data.threshold}%`;
+                    break;
+                case 'cond-swaps':
+                    thresholdText = `閾値: 前週比 >= +${data.threshold}%`;
+                    break;
+                case 'cond-usdjpy':
+                    thresholdText = `閾値: 週次変化 >= +${data.threshold}%`;
+                    break;
+            }
+            thresholdElement.textContent = thresholdText;
+
+            // 判定理由
+            reasonElement.textContent = data.reason || '判定中...';
+        }
+
+        // 値ボックスを更新する関数
+        function updateValueBox(id, value, change, date, formatFn) {
+            const valueEl = document.getElementById(id + '-value');
+            const changeEl = document.getElementById(id + '-change');
+            const dateEl = document.getElementById(id + '-date');
+
+            if (value === null || value === undefined) {
+                valueEl.textContent = 'N/A';
+                valueEl.className = 'value';
+                changeEl.textContent = '--';
+                return;
+            }
+
+            valueEl.textContent = formatFn(value);
+            valueEl.className = 'value';
+
+            if (change !== null && change !== undefined) {
+                changeEl.textContent = `週次 ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeEl.className = 'change ' + (change >= 0 ? 'positive' : 'negative');
+            }
+
+            if (date && dateEl) {
+                dateEl.textContent = `Data: ${date}`;
+            }
+        }
+
         async function loadData() {
             try {
                 // ダッシュボードAPIからシグナルデータを取得
@@ -492,6 +749,10 @@
                 if (hiddenQeSignal && hiddenQeSignal.details) {
                     const qe = hiddenQeSignal.details;
 
+                    // 最終更新時刻
+                    document.getElementById('update-time').textContent =
+                        `最終更新: ${qe.updated_at || data.timestamp} (自動更新: 60秒)`;
+
                     // シグナルバッジ更新
                     const badge = document.getElementById('signal-badge');
                     badge.textContent = qe.signal;
@@ -501,28 +762,20 @@
                     document.getElementById('signal-explanation').textContent = qe.explanation;
 
                     // 条件チェックリスト更新
-                    updateCondition('cond-total-assets', qe.details.total_assets, 'total_assets');
-                    updateCondition('cond-treasury', qe.details.treasury, 'treasury');
-                    updateCondition('cond-swaps', qe.details.swaps, 'swaps');
-                    updateCondition('cond-usdjpy', qe.details.usdjpy, 'usdjpy');
+                    updateCondition('cond-total-assets', qe.details.total_assets);
+                    updateCondition('cond-treasury', qe.details.treasury);
+                    updateCondition('cond-swaps', qe.details.swaps);
+                    updateCondition('cond-usdjpy', qe.details.usdjpy);
 
                     // 現在値更新
-                    if (qe.details.total_assets.value) {
-                        document.getElementById('walcl-value').textContent = `$${(qe.details.total_assets.value / 1e6).toFixed(2)}T`;
-                        updateChange('walcl-change', qe.details.total_assets.change);
-                    }
-                    if (qe.details.treasury.value) {
-                        document.getElementById('treast-value').textContent = `$${(qe.details.treasury.value / 1e6).toFixed(2)}T`;
-                        updateChange('treast-change', qe.details.treasury.change);
-                    }
-                    if (qe.details.swaps.value) {
-                        document.getElementById('swpt-value').textContent = `$${(qe.details.swaps.value / 1e3).toFixed(1)}B`;
-                        updateChange('swpt-change', qe.details.swaps.change);
-                    }
-                    if (qe.details.usdjpy.value) {
-                        document.getElementById('usdjpy-value').textContent = qe.details.usdjpy.value.toFixed(2);
-                        updateChange('usdjpy-change', qe.details.usdjpy.change);
-                    }
+                    updateValueBox('walcl', qe.details.total_assets?.value, qe.details.total_assets?.change,
+                        qe.details.total_assets?.date, v => `$${(v / 1e6).toFixed(2)}T`);
+                    updateValueBox('treast', qe.details.treasury?.value, qe.details.treasury?.change,
+                        qe.details.treasury?.date, v => `$${(v / 1e6).toFixed(2)}T`);
+                    updateValueBox('swpt', qe.details.swaps?.value, qe.details.swaps?.change,
+                        qe.details.swaps?.date, v => `$${(v / 1e3).toFixed(1)}B`);
+                    updateValueBox('usdjpy', qe.details.usdjpy?.value, qe.details.usdjpy?.change,
+                        null, v => v.toFixed(2));
                 }
 
                 // 履歴データを取得してチャート描画
@@ -534,63 +787,18 @@
 
             } catch (error) {
                 console.error('Failed to load data:', error);
-                document.getElementById('signal-explanation').textContent = 'データの読み込みに失敗しました';
+                document.getElementById('signal-badge').textContent = 'ERROR';
+                document.getElementById('signal-badge').className = 'signal-badge off';
+                document.getElementById('signal-explanation').textContent =
+                    'データの読み込みに失敗しました。ページを再読み込みしてください。';
                 document.getElementById('chartLoading').textContent = 'チャートの読み込みに失敗しました';
             }
-        }
-
-        function updateCondition(elementId, data, type) {
-            const element = document.getElementById(elementId);
-            const valueElement = document.getElementById(elementId + '-value');
-            const iconElement = element.querySelector('.condition-icon');
-
-            if (!data || data.value === null) {
-                iconElement.textContent = '-';
-                valueElement.textContent = 'データなし';
-                return;
-            }
-
-            let isMet = false;
-            let valueText = '';
-
-            switch(type) {
-                case 'total_assets':
-                    isMet = data.status === '増加';
-                    valueText = `前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
-                    break;
-                case 'treasury':
-                    isMet = data.status === '非活発';
-                    valueText = `前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
-                    break;
-                case 'swaps':
-                    isMet = data.status === '急増';
-                    valueText = `前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
-                    break;
-                case 'usdjpy':
-                    isMet = data.status === '円安進行';
-                    valueText = `${data.value?.toFixed(2)} (週次 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%)`;
-                    break;
-            }
-
-            element.className = 'condition-item ' + (isMet ? 'met' : 'not-met');
-            iconElement.textContent = isMet ? '✓' : '✗';
-            valueElement.textContent = valueText;
-        }
-
-        function updateChange(elementId, change) {
-            const element = document.getElementById(elementId);
-            if (change === null || change === undefined) {
-                element.textContent = '--';
-                return;
-            }
-            element.textContent = `週次 ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-            element.className = 'change ' + (change >= 0 ? 'positive' : 'negative');
         }
 
         function renderChart(data) {
             const ctx = document.getElementById('swapsChart').getContext('2d');
 
-            const swapsData = data.swpt?.map(d => ({ x: d.date, y: d.value / 1e3 })) || []; // 10億ドル単位
+            const swapsData = data.swpt?.map(d => ({ x: d.date, y: d.value / 1e3 })) || [];
 
             if (chart) chart.destroy();
 
@@ -645,7 +853,11 @@
             });
         }
 
+        // 初回読み込み
         document.addEventListener('DOMContentLoaded', loadData);
+
+        // 60秒ごとに自動更新
+        setInterval(loadData, 60000);
     </script>
 </body>
 </html>
