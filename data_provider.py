@@ -131,13 +131,27 @@ async def get_dxy(session: aiohttp.ClientSession, target_date: Optional[datetime
         print(f"⚠️ DXY取得失敗: {e}")
         return None
 
+async def _get_yahoo_finance_range(session: aiohttp.ClientSession, symbol: str, days: int = 5):
+    """Yahoo Financeから指定日数分のデータを取得"""
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+    params = {"interval": "1d", "range": f"{days}d"}
+    headers = {"User-Agent": config.USER_AGENT}
+    try:
+        async with session.get(url, params=params, headers=headers, timeout=20) as response:
+            if response.status == 200:
+                return await response.json()
+    except Exception as e:
+        print(f"⚠️ Yahoo Finance取得失敗 ({symbol}): {e}")
+    return None
+
 async def get_macro_data(session: aiohttp.ClientSession, target_date: Optional[datetime] = None) -> Dict:
     result = {}
     endpoints = {"gold": "GC=F", "sp500": "^GSPC", "vix": "^VIX"}
-    
-    tasks = {key: _get_yahoo_finance_data(session, symbol, target_date) for key, symbol in endpoints.items()}
+
+    # 5日分のデータを取得して変化率を計算
+    tasks = {key: _get_yahoo_finance_range(session, symbol, 5) for key, symbol in endpoints.items()}
     responses = await asyncio.gather(*tasks.values(), return_exceptions=True)
-    
+
     res_map = dict(zip(tasks.keys(), responses))
 
     for key, res_data in res_map.items():
