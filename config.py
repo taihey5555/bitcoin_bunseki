@@ -119,3 +119,16 @@ HIDDEN_QE_SIGNAL_ON = 4       # 4点: ON（強いシグナル）
 HIDDEN_QE_SIGNAL_WATCH = 2    # 2-3点: WATCH（注視）
 # 0-1点: OFF（シグナルなし）
 
+
+# ============================================
+# 総合スコア計算モード
+# ============================================
+# "momentum":     neutralを分母から除外。トレンド追従型。
+#                 例: bull=3, bear=1, neutral=5 → score = (3-1)/(3+1)*100 = 50
+#                 → シグナルが出ている指標だけで方向性を判断。攻めの運用向き。
+#
+# "conservative": neutralも分母に含める。慎重型。
+#                 例: bull=3, bear=1, neutral=5 → score = (3-1)/(3+1+5)*100 = 22
+#                 → 「判断材料なし」も情報として扱い、スコアを抑制。守りの運用向き。
+SCORE_CALC_MODE = "momentum"  # "momentum" or "conservative"
+

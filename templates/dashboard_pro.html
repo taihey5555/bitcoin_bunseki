@@ -314,8 +314,19 @@
                     </div>
                 </div>
                 <div class="logic-formula">
-                    <strong>総合スコア計算:</strong> (強気シグナル重み - 弱気シグナル重み) ÷ 全シグナル数 × 100
+                    <strong>総合スコア計算:</strong>
+                    <span id="score-formula-text">(強気重み - 弱気重み) ÷ アクティブ重み × 100</span>
                 </div>
+                <div class="mode-toggle-container" style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <span style="font-size: 13px; color: #888;">計算モード:</span>
+                    <div class="mode-toggle" style="display: flex; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                        <button id="mode-momentum" class="mode-btn active" onclick="setScoreMode('momentum')" style="padding: 6px 14px; border: none; background: #4facfe; color: #000; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s;">Momentum</button>
+                        <button id="mode-conservative" class="mode-btn" onclick="setScoreMode('conservative')" style="padding: 6px 14px; border: none; background: transparent; color: #888; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s;">Conservative</button>
+                    </div>
+                    <span id="mode-description" style="font-size: 11px; color: #666;">中立を除外しトレンド重視</span>
+                </div>
+                <div id="score-details" class="score-details" style="margin-top: 8px; font-size: 12px; color: #888;"></div>
+                <div id="confidence-display" style="margin-top: 6px; font-size: 12px; color: #888;">信頼度: <span id="confidence-value" style="font-weight: 600; color: #4facfe;">--</span>%（アクティブシグナルの割合）</div>
             </div>
 
             <div class="footer">
@@ -329,6 +340,46 @@
         function toggleMenu() {
             document.querySelector('.hamburger').classList.toggle('active');
             document.getElementById('mobileMenu').classList.toggle('active');
+        }
+
+        // スコア計算モード管理
+        function getScoreMode() {
+            let mode = localStorage.getItem('scoreCalcMode') || 'momentum';
+            // 旧モード名の移行: balance → conservative
+            if (mode === 'balance') {
+                mode = 'conservative';
+                localStorage.setItem('scoreCalcMode', mode);
+            }
+            return mode;
+        }
+
+        function setScoreMode(mode) {
+            localStorage.setItem('scoreCalcMode', mode);
+            updateModeUI(mode);
+            updateDashboard(); // 新しいモードでデータを再取得
+        }
+
+        function updateModeUI(mode) {
+            const momentumBtn = document.getElementById('mode-momentum');
+            const conservativeBtn = document.getElementById('mode-conservative');
+            const modeDesc = document.getElementById('mode-description');
+            const formulaText = document.getElementById('score-formula-text');
+
+            if (mode === 'momentum') {
+                momentumBtn.style.background = '#4facfe';
+                momentumBtn.style.color = '#000';
+                conservativeBtn.style.background = 'transparent';
+                conservativeBtn.style.color = '#888';
+                if (modeDesc) modeDesc.textContent = '中立を除外しトレンド重視';
+                if (formulaText) formulaText.textContent = '(強気重み - 弱気重み) ÷ アクティブ重み × 100';
+            } else {
+                conservativeBtn.style.background = '#ffd93d';
+                conservativeBtn.style.color = '#000';
+                momentumBtn.style.background = 'transparent';
+                momentumBtn.style.color = '#888';
+                if (modeDesc) modeDesc.textContent = '中立も含め慎重に評価';
+                if (formulaText) formulaText.textContent = '(強気重み - 弱気重み) ÷ 全重み × 100';
+            }
         }
 
         const timestampEl = document.getElementById('timestamp');
@@ -353,7 +404,8 @@
 
         async function updateDashboard() {
             try {
-                const response = await fetch('/api/data');
+                const scoreMode = getScoreMode();
+                const response = await fetch(`/api/data?score_mode=${scoreMode}`);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
 
@@ -393,6 +445,29 @@
                 summaryContainerEl.style.borderColor = `${scoreColor}4D`;
                 summaryTitleEl.style.color = scoreColor;
 
+                // スコア計算詳細を表示
+                if (data.scoreDetails) {
+                    const sd = data.scoreDetails;
+                    const detailsEl = document.getElementById('score-details');
+                    if (detailsEl) {
+                        detailsEl.innerHTML = `計算式: ${sd.formula} = <strong>${score}</strong> ｜ 強気: ${sd.bullishWeight}, 弱気: ${sd.bearishWeight}, 中立: ${sd.neutralWeight}`;
+                    }
+                }
+
+                // 信頼度を表示
+                const confidenceEl = document.getElementById('confidence-value');
+                if (confidenceEl && data.confidence !== undefined) {
+                    confidenceEl.textContent = data.confidence;
+                    // 信頼度に応じて色を変更
+                    if (data.confidence >= 60) {
+                        confidenceEl.style.color = '#2ed573'; // 高信頼度: 緑
+                    } else if (data.confidence >= 40) {
+                        confidenceEl.style.color = '#ffd93d'; // 中信頼度: 黄
+                    } else {
+                        confidenceEl.style.color = '#ff4757'; // 低信頼度: 赤
+                    }
+                }
+
             } catch (error) {
                 console.error('Failed to update dashboard:', error);
                 summaryTextEl.textContent = 'データの取得に失敗しました。';
@@ -400,6 +475,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // 保存されたモードでUIを初期化
+            updateModeUI(getScoreMode());
             updateDashboard();
             setInterval(updateDashboard, 60000);
         });

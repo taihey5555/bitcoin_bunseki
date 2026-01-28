@@ -7,7 +7,7 @@ BTCシグナルダッシュボード用 バックエンドサーバー
 import asyncio
 import aiohttp
 import json
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from datetime import datetime
 
 # 共通モジュールからインポート
@@ -558,11 +558,41 @@ def get_data():
 
         signals.append(sig_hidden_qe)
 
+        # =====================================================================
+        # 総合スコア計算
+        # =====================================================================
+        # 各シグナルの重み合計を算出（neutral も weight を使用し対称性を確保）
         bull_w = sum(s["weight"] for s in signals if s["status"] == "bullish")
         bear_w = sum(s["weight"] for s in signals if s["status"] == "bearish")
-        neut_w = sum(1 for s in signals if s["status"] == "neutral")
-        total_weight = bull_w + bear_w + neut_w
-        score = ((bull_w - bear_w) / total_weight) * 100 if total_weight > 0 else 0
+        neut_w = sum(s["weight"] for s in signals if s["status"] == "neutral")
+
+        # confidence（信頼度）: アクティブなシグナルの割合
+        # 値が高いほど「方向感のあるシグナルが多い」= 判断材料が豊富
+        total_w = bull_w + bear_w + neut_w
+        active_w = bull_w + bear_w
+        confidence = (active_w / total_w * 100) if total_w > 0 else 0
+
+        # スコア計算モード（クエリパラメータ優先、なければconfig設定を使用）
+        score_mode = request.args.get('score_mode', getattr(config, 'SCORE_CALC_MODE', 'momentum'))
+        if score_mode not in ('momentum', 'conservative'):
+            score_mode = 'momentum'
+
+        if score_mode == "momentum":
+            # -------------------------------------------------------------
+            # Momentumモード: neutral を分母から除外
+            # 思想: 「判断材料がある指標」だけで方向性を測る。
+            #       neutral が多くてもスコアが薄まらない。トレンド追従向き。
+            # 計算: score = (bull - bear) / (bull + bear) * 100
+            # -------------------------------------------------------------
+            score = ((bull_w - bear_w) / max(active_w, 1)) * 100
+        else:
+            # -------------------------------------------------------------
+            # Conservativeモード: neutral も分母に含める
+            # 思想: 「判断材料がない」ことも情報として扱う。
+            #       neutral が多いほどスコアは0に近づき、慎重な判断を促す。
+            # 計算: score = (bull - bear) / (bull + bear + neutral) * 100
+            # -------------------------------------------------------------
+            score = ((bull_w - bear_w) / total_w * 100) if total_w > 0 else 0
 
         summary_text = "方向感が出にくい状況。様子見推奨。"
         if score > 30: summary_text = "強気のシグナルが優勢です。DXYのドル安傾向や市場心理の改善が追い風となっています。"
@@ -574,6 +604,14 @@ def get_data():
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
             "btcPrice": btc.get("usd", 0),
             "score": round(score),
+            "confidence": round(confidence),
+            "scoreDetails": {
+                "mode": score_mode,
+                "bullishWeight": bull_w,
+                "bearishWeight": bear_w,
+                "neutralWeight": neut_w,
+                "formula": f"({bull_w} - {bear_w}) / {active_w}" if score_mode == "momentum" else f"({bull_w} - {bear_w}) / {total_w}"
+            },
             "summary": {"title": "💡 分析サマリー", "text": summary_text},
             "signals": signals,
             "is_fallback": False
