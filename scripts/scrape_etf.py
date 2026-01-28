@@ -65,47 +65,46 @@ def scrape_etf_flow():
                     continue
                 date_str = date_match.group(1)
 
+                # "-" が多い行はスキップ（データなしの行）
+                # 単独の "-" をカウント（"-50" のような負の数ではなく）
+                dash_count = len(re.findall(r'(?<!\d)-(?!\d)', text))
+                print(f"Dash count (no data indicators): {dash_count}")
+                if dash_count >= 5:
+                    print(f"Too many no-data indicators, skipping...")
+                    continue
+
                 # 日付以降のテキストから数値を抽出
                 text_after_date = text[10:]
 
-                # "K" を含む数値も処理（例: -505.09K = -505090）
-                # スペースや+/-で区切られた数値を抽出
-                raw_numbers = re.findall(r'[+-]?\s*\d+\.?\d*K?', text_after_date)
+                # 数値を抽出（+付き、-付き、K付きを含む）
+                # "+183.54" や "-65.80" や "1.13K" などにマッチ
+                raw_numbers = re.findall(r'[+-]?\d+\.?\d*K?', text_after_date)
 
                 def parse_value(val_str):
                     try:
-                        val_str = val_str.replace(' ', '').replace('+', '')
+                        val_str = val_str.replace('+', '')
                         if 'K' in val_str.upper():
                             return float(val_str.upper().replace('K', '')) * 1000
                         return float(val_str)
                     except:
                         return 0
 
-                numbers = [parse_value(n) for n in raw_numbers if n.strip() not in ['', '-', '+']]
+                numbers = [parse_value(n) for n in raw_numbers]
                 print(f"Parsed numbers: {numbers[:15]}...")
 
-                if len(numbers) < 3:
-                    print(f"Not enough numbers, skipping...")
+                if len(numbers) < 10:
+                    print(f"Not enough numbers ({len(numbers)}), skipping...")
                     continue
 
-                # 0ばかりの行はスキップ
-                non_zero = [n for n in numbers if n != 0]
-                if len(non_zero) < 1:
-                    print(f"All zeros, trying next row...")
-                    continue
-
-                # 最後の値が日次合計（または最後から3番目）
-                # CoinGlassの構造: [ETF1, ETF2, ..., ETF10, 日次合計, 週次, 月次]
-                # ただし週次・月次がない場合もある
-                if len(numbers) >= 11:
-                    # 最後の1〜3個が合計系
-                    daily_total = numbers[-1]  # 最後が日次合計の可能性
-
-                    # ETF個別フロー（最後の1個を除く、最大10個）
-                    etf_values = numbers[:-1][:10]
+                # ETF個別フロー + 合計（日次、週次、月次）
+                # CoinGlassの構造: [ETF1, ..., ETF10, 日次合計, 週次, 月次]
+                # 最後から3番目が日次合計
+                if len(numbers) >= 13:
+                    daily_total = numbers[-3]  # 日次合計
+                    etf_values = numbers[:-3][:10]  # 最初の10個がETF
                 else:
                     daily_total = numbers[-1]
-                    etf_values = numbers[:-1]
+                    etf_values = numbers[:-1][:10]
 
                 etf_flows = []
                 for i, name in enumerate(etf_names):
@@ -114,7 +113,7 @@ def scrape_etf_flow():
                         if flow != 0:
                             etf_flows.append({"symbol": name, "daily_flow": flow})
 
-                print(f"Date: {date_str}, Daily total: {daily_total}, Top flows: {etf_flows[:3]}")
+                print(f"Date: {date_str}, Daily total: {daily_total}, ETF flows: {etf_flows[:5]}")
 
                 return {
                     "total_daily_flow": daily_total,
