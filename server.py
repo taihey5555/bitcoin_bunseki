@@ -116,12 +116,26 @@ def get_data():
             elif fr < config.FUNDING_RATE_COOLING: sig_fr["status"] = "bullish"
         signals.append(sig_fr)
 
-        sig_gold = {"name": "Gold", "status": "neutral", "weight": 1, "value": "N/A"}
-        if macro_yh and macro_yh.get("gold_change") is not None:
-            gc = macro_yh["gold_change"]
-            sig_gold["value"] = f"{gc:+.1f}%"
-            if abs(gc) > config.GOLD_CHANGE_THRESHOLD: sig_gold["status"] = "bullish" if gc > 0 else "bearish"
-        signals.append(sig_gold)
+        # Gold vs BTC ローテーションシグナル
+        sig_rotation = {"name": "Gold→BTC", "status": "neutral", "weight": 1, "value": "N/A"}
+        gold_change = macro_yh.get("gold_change") if macro_yh else None
+        btc_change = btc.get("change") if btc else None
+
+        if gold_change is not None and btc_change is not None:
+            sig_rotation["value"] = f"Au:{gold_change:+.1f}% BTC:{btc_change:+.1f}%"
+
+            # Gold下落 + BTC上昇 = ローテーション発生（強気）
+            if gold_change < -1.0 and btc_change > 1.0:
+                sig_rotation.update({"status": "bullish", "weight": 2})
+            elif gold_change < 0 and btc_change > 0:
+                sig_rotation["status"] = "bullish"
+            # Gold上昇 + BTC下落 = 安全資産へ逃避（弱気）
+            elif gold_change > 1.0 and btc_change < -1.0:
+                sig_rotation.update({"status": "bearish", "weight": 2})
+            elif gold_change > 0 and btc_change < 0:
+                sig_rotation["status"] = "bearish"
+            # それ以外は中立
+        signals.append(sig_rotation)
 
         sig_etf = {"name": "ETFフロー", "status": "neutral", "weight": 1, "value": "N/A", "details": None}
         if etf_flow:

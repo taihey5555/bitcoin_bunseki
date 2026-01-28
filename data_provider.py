@@ -71,14 +71,25 @@ async def get_fred_data(session: aiohttp.ClientSession, series_id: str, target_d
     return None
 
 async def get_btc_price(session: aiohttp.ClientSession, target_date: Optional[datetime] = None) -> Dict:
-    """Yahoo FinanceからBTC価格を取得"""
+    """Yahoo FinanceからBTC価格と変化率を取得"""
     try:
-        data = await _get_yahoo_finance_data(session, "BTC-USD", target_date)
-        if not data: return {}
-        
+        # 5日分のデータを取得して変化率を計算
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD"
+        params = {"interval": "1d", "range": "5d"}
+        headers = {"User-Agent": config.USER_AGENT}
+
+        async with aiohttp.ClientSession() as temp_session:
+            async with temp_session.get(url, params=params, headers=headers, timeout=20) as response:
+                if response.status != 200:
+                    return {}
+                data = await response.json()
+
         closes = data.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        closes = [c for c in closes if c is not None]
+
         if closes:
-            return {"usd": closes[-1], "jpy": None} # JPYはYahoo FinanceのこのAPIでは直接取得しない
+            change = ((closes[-1] - closes[0]) / closes[0] * 100) if len(closes) > 1 else 0
+            return {"usd": closes[-1], "jpy": None, "change": change}
         return {}
     except Exception as e:
         print(f"⚠️ BTC価格取得失敗: {e}")
