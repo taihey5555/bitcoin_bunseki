@@ -70,6 +70,9 @@ def update_gist(data):
     github_token = os.environ.get('GH_TOKEN')
 
     print(f"DEBUG: GIST_ID = {gist_id}")
+    print(f"DEBUG: GIST_ID first 4 chars = {gist_id[:4] if gist_id else 'None'}")
+    print(f"DEBUG: GIST_ID last 4 chars = {gist_id[-4:] if gist_id else 'None'}")
+    print(f"DEBUG: GIST_ID length = {len(gist_id) if gist_id else 0}")
     print(f"DEBUG: GH_TOKEN exists = {bool(github_token)}")
     print(f"DEBUG: GH_TOKEN length = {len(github_token) if github_token else 0}")
 
