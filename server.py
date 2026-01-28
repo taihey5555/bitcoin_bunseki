@@ -452,54 +452,83 @@ def get_data():
 
         signals = []
 
-        sig_liquidity = {"name": "USD流動性", "status": "neutral", "weight": 1, "value": "N/A"}
-        if liquidity:
+        # =====================================================================
+        # シグナル生成（各シグナルに available / reason を付与）
+        # available=True: データ取得成功、スコア計算に含める
+        # available=False: データ欠損、スコア計算から除外（coverageで表示）
+        # =====================================================================
+
+        # USD流動性（FRED API必須）
+        sig_liquidity = {"name": "USD流動性", "status": "neutral", "weight": 1, "value": "N/A", "available": False, "reason": ""}
+        if config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE" or not config.FRED_API_KEY:
+            sig_liquidity["reason"] = "FRED APIキー未設定"
+        elif not all([balance_sheet, rrp is not None, tga]):
+            sig_liquidity["reason"] = "FRED データ取得失敗"
+        elif liquidity:
+            sig_liquidity["available"] = True
             sig_liquidity["value"] = f"${liquidity/1e6:.2f}T"
             if liquidity > config.LIQUIDITY_BULLISH_STRONG: sig_liquidity.update({"status": "bullish", "weight": 2})
             elif liquidity > config.LIQUIDITY_BULLISH_WEAK: sig_liquidity["status"] = "bullish"
             elif liquidity < config.LIQUIDITY_BEARISH_STRONG: sig_liquidity.update({"status": "bearish", "weight": 2})
         signals.append(sig_liquidity)
 
-        sig_dxy = {"name": "DXY", "status": "neutral", "weight": 1, "value": "N/A"}
+        # DXY（Yahoo Finance）
+        sig_dxy = {"name": "DXY", "status": "neutral", "weight": 1, "value": "N/A", "available": False, "reason": ""}
         if dxy and dxy.get("value"):
+            sig_dxy["available"] = True
             sig_dxy["value"] = f'{dxy["value"]:.1f}'
             if dxy["value"] > config.DXY_BEARISH_STRONG: sig_dxy.update({"status": "bearish", "weight": 2})
             elif dxy["value"] > config.DXY_BEARISH_WEAK: sig_dxy["status"] = "bearish"
             elif dxy["value"] < config.DXY_BULLISH_STRONG: sig_dxy.update({"status": "bullish", "weight": 2})
+        else:
+            sig_dxy["reason"] = "Yahoo Finance取得失敗"
         signals.append(sig_dxy)
 
-        sig_fg = {"name": "Fear & Greed", "status": "neutral", "weight": 1, "value": "N/A"}
+        # Fear & Greed Index
+        sig_fg = {"name": "Fear & Greed", "status": "neutral", "weight": 1, "value": "N/A", "available": False, "reason": ""}
         if fg:
+            sig_fg["available"] = True
             sig_fg["value"] = str(fg)
             if fg <= config.FEAR_GREED_EXTREME_FEAR: sig_fg.update({"status": "bullish", "weight": 2})
             elif fg <= config.FEAR_GREED_FEAR: sig_fg["status"] = "bullish"
             elif fg >= config.FEAR_GREED_EXTREME_GREED: sig_fg.update({"status": "bearish", "weight": 2})
             elif fg >= config.FEAR_GREED_GREED: sig_fg["status"] = "bearish"
+        else:
+            sig_fg["reason"] = "API取得失敗"
         signals.append(sig_fg)
 
-        sig_flow = {"name": "取引所フロー", "status": "neutral", "weight": 1, "value": "N/A"}
+        # 取引所フロー（CoinGlass）
+        sig_flow = {"name": "取引所フロー", "status": "neutral", "weight": 1, "value": "N/A", "available": False, "reason": ""}
         if ex_flow and ex_flow.get("net_flow") is not None:
+            sig_flow["available"] = True
             flow = ex_flow["net_flow"]
             sig_flow["value"] = f"{flow:+.0f} BTC"
             if flow > config.EXCHANGE_NET_FLOW_BULLISH_STRONG: sig_flow.update({"status": "bullish", "weight": 2})
             elif flow > config.EXCHANGE_NET_FLOW_BULLISH_WEAK: sig_flow["status"] = "bullish"
             elif flow < config.EXCHANGE_NET_FLOW_BEARISH_STRONG: sig_flow.update({"status": "bearish", "weight": 2})
             else: sig_flow["status"] = "bearish"
+        else:
+            sig_flow["reason"] = "CoinGlass取得失敗"
         signals.append(sig_flow)
 
-        sig_fr = {"name": "Funding Rate", "status": "neutral", "weight": 1, "value": "N/A"}
+        # Funding Rate
+        sig_fr = {"name": "Funding Rate", "status": "neutral", "weight": 1, "value": "N/A", "available": False, "reason": ""}
         if fr is not None:
+            sig_fr["available"] = True
             sig_fr["value"] = f"{fr:+.4f}%"
             if fr > config.FUNDING_RATE_OVERHEAT: sig_fr["status"] = "bearish"
             elif fr < config.FUNDING_RATE_COOLING: sig_fr["status"] = "bullish"
+        else:
+            sig_fr["reason"] = "OKX API取得失敗"
         signals.append(sig_fr)
 
         # Gold vs BTC ローテーションシグナル
-        sig_rotation = {"name": "Gold→BTC", "status": "neutral", "weight": 1, "value": "N/A"}
+        sig_rotation = {"name": "Gold→BTC", "status": "neutral", "weight": 1, "value": "N/A", "available": False, "reason": ""}
         gold_change = macro_yh.get("gold_change") if macro_yh else None
         btc_change = btc.get("change") if btc else None
 
         if gold_change is not None and btc_change is not None:
+            sig_rotation["available"] = True
             sig_rotation["value"] = f"Au:{gold_change:+.1f}% BTC:{btc_change:+.1f}%"
 
             # Gold下落 + BTC上昇 = ローテーション発生（強気）
@@ -513,14 +542,21 @@ def get_data():
             elif gold_change > 0 and btc_change < 0:
                 sig_rotation["status"] = "bearish"
             # それ以外は中立
+        else:
+            sig_rotation["reason"] = "Gold/BTC価格取得失敗"
         signals.append(sig_rotation)
 
-        sig_etf = {"name": "ETFフロー", "status": "neutral", "weight": 1, "value": "N/A", "details": None}
-        if etf_flow:
+        # ETFフロー（Gist URL必須）
+        sig_etf = {"name": "ETFフロー", "status": "neutral", "weight": 1, "value": "N/A", "details": None, "available": False, "reason": ""}
+        if not config.ETF_GIST_URL:
+            sig_etf["reason"] = "ETF_GIST_URL未設定"
+        elif etf_flow:
             if etf_flow.get("status") == "fetching":
                 sig_etf["value"] = "取得中..."
                 sig_etf["status"] = "loading"
+                sig_etf["reason"] = "取得中"
             elif etf_flow.get("total_daily_flow") is not None:
+                sig_etf["available"] = True
                 flow = etf_flow["total_daily_flow"]
                 sig_etf["value"] = f"{flow:+.1f}M USD"
                 sig_etf["details"] = {
@@ -535,9 +571,13 @@ def get_data():
                     sig_etf.update({"status": "bearish", "weight": 2})
                 elif flow <= config.ETF_FLOW_BEARISH_WEAK:
                     sig_etf["status"] = "bearish"
+            else:
+                sig_etf["reason"] = "ETFデータ取得失敗"
+        else:
+            sig_etf["reason"] = "ETFデータ取得失敗"
         signals.append(sig_etf)
 
-        # 隠れQE（日本経由）シグナル
+        # 隠れQE（日本経由）シグナル（FRED API必須）
         # Arthur Hayes Thesis: FRBが日本市場を使って隠れた量的緩和を行っている兆候
         hidden_qe = calculate_hidden_qe_signal(walcl_weekly, swpt_data, treast_data, usdjpy_data)
 
@@ -546,27 +586,46 @@ def get_data():
             "status": "neutral",
             "weight": 1,
             "value": f"{hidden_qe['signal']} ({hidden_qe['score']}/4)",
-            "details": hidden_qe
+            "details": hidden_qe,
+            "available": False,
+            "reason": ""
         }
 
-        # シグナルに応じてステータスを設定
-        if hidden_qe["signal"] == "ON":
-            sig_hidden_qe.update({"status": "bullish", "weight": 2})
-        elif hidden_qe["signal"] == "WATCH":
-            sig_hidden_qe["status"] = "bullish"
-        # OFF の場合は neutral のまま
+        # データ可用性チェック
+        if config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE" or not config.FRED_API_KEY:
+            sig_hidden_qe["reason"] = "FRED APIキー未設定"
+        elif not all([walcl_weekly, swpt_data, usdjpy_data]):
+            sig_hidden_qe["reason"] = "FRED/USDJPY取得失敗"
+        else:
+            sig_hidden_qe["available"] = True
+            # シグナルに応じてステータスを設定
+            if hidden_qe["signal"] == "ON":
+                sig_hidden_qe.update({"status": "bullish", "weight": 2})
+            elif hidden_qe["signal"] == "WATCH":
+                sig_hidden_qe["status"] = "bullish"
+            # OFF の場合は neutral のまま
 
         signals.append(sig_hidden_qe)
 
         # =====================================================================
         # 総合スコア計算
         # =====================================================================
-        # 各シグナルの重み合計を算出（neutral も weight を使用し対称性を確保）
-        bull_w = sum(s["weight"] for s in signals if s["status"] == "bullish")
-        bear_w = sum(s["weight"] for s in signals if s["status"] == "bearish")
-        neut_w = sum(s["weight"] for s in signals if s["status"] == "neutral")
+        # available=True のシグナルのみでスコアを計算（データ欠損は除外）
+        available_signals = [s for s in signals if s.get("available", False)]
+        unavailable_signals = [s for s in signals if not s.get("available", False)]
 
-        # confidence（信頼度）: アクティブなシグナルの割合
+        # coverage: データカバレッジ（取得成功率）
+        # 80%未満の場合は警告を表示
+        total_signal_count = len(signals)
+        available_count = len(available_signals)
+        coverage = (available_count / total_signal_count * 100) if total_signal_count > 0 else 0
+
+        # 各シグナルの重み合計を算出（available かつ neutral も weight を使用し対称性を確保）
+        bull_w = sum(s["weight"] for s in available_signals if s["status"] == "bullish")
+        bear_w = sum(s["weight"] for s in available_signals if s["status"] == "bearish")
+        neut_w = sum(s["weight"] for s in available_signals if s["status"] == "neutral")
+
+        # confidence（信頼度）: アクティブなシグナルの割合（available内での比率）
         # 値が高いほど「方向感のあるシグナルが多い」= 判断材料が豊富
         total_w = bull_w + bear_w + neut_w
         active_w = bull_w + bear_w
@@ -600,18 +659,26 @@ def get_data():
         elif score < -30: summary_text = "弱気のシグナルが優勢です。マクロ経済の不透明感から、短期的な下落に警戒が必要です。"
         elif score < -10: summary_text = "やや弱気の環境。下落リスクに注意し、ポジション調整も視野に。"
 
+        # coverage低下時の警告をサマリーに追加
+        if coverage < 80:
+            summary_text = f"⚠️ データ欠損あり（カバレッジ{round(coverage)}%）。{summary_text}"
+
         response_data = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M UTC"),
             "btcPrice": btc.get("usd", 0),
             "score": round(score),
             "confidence": round(confidence),
+            "coverage": round(coverage),
             "scoreDetails": {
                 "mode": score_mode,
                 "bullishWeight": bull_w,
                 "bearishWeight": bear_w,
                 "neutralWeight": neut_w,
+                "availableCount": available_count,
+                "totalCount": total_signal_count,
                 "formula": f"({bull_w} - {bear_w}) / {active_w}" if score_mode == "momentum" else f"({bull_w} - {bear_w}) / {total_w}"
             },
+            "unavailableSignals": [{"name": s["name"], "reason": s.get("reason", "不明")} for s in unavailable_signals],
             "summary": {"title": "💡 分析サマリー", "text": summary_text},
             "signals": signals,
             "is_fallback": False

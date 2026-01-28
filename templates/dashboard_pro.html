@@ -326,7 +326,13 @@
                     <span id="mode-description" style="font-size: 11px; color: #666;">中立を除外しトレンド重視</span>
                 </div>
                 <div id="score-details" class="score-details" style="margin-top: 8px; font-size: 12px; color: #888;"></div>
-                <div id="confidence-display" style="margin-top: 6px; font-size: 12px; color: #888;">信頼度: <span id="confidence-value" style="font-weight: 600; color: #4facfe;">--</span>%（アクティブシグナルの割合）</div>
+                <div class="metrics-row" style="margin-top: 10px; display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: #888;">
+                    <div>信頼度: <span id="confidence-value" style="font-weight: 600; color: #4facfe;">--</span>%</div>
+                    <div>カバレッジ: <span id="coverage-value" style="font-weight: 600; color: #2ed573;">--</span>%</div>
+                </div>
+                <div id="coverage-warning" style="display: none; margin-top: 10px; padding: 10px 14px; background: rgba(255, 71, 87, 0.15); border: 1px solid rgba(255, 71, 87, 0.4); border-radius: 6px; font-size: 12px; color: #ff6b7a;">
+                    <strong>⚠️ データ欠損警告:</strong> <span id="coverage-warning-text"></span>
+                </div>
             </div>
 
             <div class="footer">
@@ -450,7 +456,7 @@
                     const sd = data.scoreDetails;
                     const detailsEl = document.getElementById('score-details');
                     if (detailsEl) {
-                        detailsEl.innerHTML = `計算式: ${sd.formula} = <strong>${score}</strong> ｜ 強気: ${sd.bullishWeight}, 弱気: ${sd.bearishWeight}, 中立: ${sd.neutralWeight}`;
+                        detailsEl.innerHTML = `計算式: ${sd.formula} = <strong>${score}</strong> ｜ 強気: ${sd.bullishWeight}, 弱気: ${sd.bearishWeight}, 中立: ${sd.neutralWeight} ｜ 有効: ${sd.availableCount}/${sd.totalCount}件`;
                     }
                 }
 
@@ -458,13 +464,37 @@
                 const confidenceEl = document.getElementById('confidence-value');
                 if (confidenceEl && data.confidence !== undefined) {
                     confidenceEl.textContent = data.confidence;
-                    // 信頼度に応じて色を変更
                     if (data.confidence >= 60) {
-                        confidenceEl.style.color = '#2ed573'; // 高信頼度: 緑
+                        confidenceEl.style.color = '#2ed573';
                     } else if (data.confidence >= 40) {
-                        confidenceEl.style.color = '#ffd93d'; // 中信頼度: 黄
+                        confidenceEl.style.color = '#ffd93d';
                     } else {
-                        confidenceEl.style.color = '#ff4757'; // 低信頼度: 赤
+                        confidenceEl.style.color = '#ff4757';
+                    }
+                }
+
+                // カバレッジを表示
+                const coverageEl = document.getElementById('coverage-value');
+                const warningEl = document.getElementById('coverage-warning');
+                const warningTextEl = document.getElementById('coverage-warning-text');
+                if (coverageEl && data.coverage !== undefined) {
+                    coverageEl.textContent = data.coverage;
+                    if (data.coverage >= 80) {
+                        coverageEl.style.color = '#2ed573'; // 高カバレッジ: 緑
+                    } else if (data.coverage >= 50) {
+                        coverageEl.style.color = '#ffd93d'; // 中カバレッジ: 黄
+                    } else {
+                        coverageEl.style.color = '#ff4757'; // 低カバレッジ: 赤
+                    }
+
+                    // カバレッジ80%未満で警告バナー表示
+                    if (data.coverage < 80 && warningEl && warningTextEl) {
+                        const unavailable = data.unavailableSignals || [];
+                        const reasons = unavailable.map(s => `${s.name}(${s.reason})`).join(', ');
+                        warningTextEl.textContent = `スコア信頼度が低下しています。欠損: ${reasons}`;
+                        warningEl.style.display = 'block';
+                    } else if (warningEl) {
+                        warningEl.style.display = 'none';
                     }
                 }
 
