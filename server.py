@@ -39,7 +39,7 @@ async def fetch_all_data():
             data_provider.get_etf_flow(session),
             # 隠れQE判定用データ（週次変化率付き）
             data_provider.get_fred_data_with_change(session, "WALCL"),   # Total Assets
-            data_provider.get_fred_data_with_change(session, "SWPT"),    # Central Bank Swaps
+            data_provider.get_fred_data_with_stats(session, "SWPT"),     # Central Bank Swaps（統計付き）
             data_provider.get_fred_data_with_change(session, "TREAST"),  # Treasury Holdings
             data_provider.get_usdjpy(session),                           # USDJPY
         ]
@@ -49,32 +49,27 @@ async def fetch_all_data():
 
 def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
     """
-    隠れQE（日本経由）シグナルを計算
+    隠れQE（日本経由）シグナルを計算（精度向上版 v2）
 
     Arthur Hayes "Japanese QE Thesis":
     FRBが直接的なQEを行わずに、日本市場を経由して
     ドル流動性を供給している兆候を検出
 
-    判定条件（すべて前週比）:
+    判定条件:
     1. Total Assets（WALCL）> +0.1% → FRB資産拡大中
     2. Treasury Holdings（TREAST）< +0.5% → 国内QE非活発
-    3. Central Bank Swaps（SWPT）>= +10% → 海外へのドル供給急増
-    4. USDJPY >= +1% → 円安進行（ドル需要増）
+    3. Central Bank Swaps（SWPT）急増（複合条件）:
+       - 条件A: 週次% >= 10% かつ 週次増加額 >= 5B
+       - 条件B: z-score >= 2.0（過去52週から2σ超の異常値）
+       - 注: 値が1B未満の場合は週次%のみでは成立させない
+    4. USDJPY 円安/介入局面:
+       - 条件A: 週次変化 >= +1%（円安進行）
+       - 条件B: USDJPY >= 150 かつ ボラ >= 1.5%（高水準&高ボラ）
 
     判定結果:
     - 4条件成立: ON（強気シグナル）
     - 2-3条件成立: WATCH（注視）
     - 0-1条件成立: OFF（シグナルなし）
-
-    Returns:
-        {
-            "signal": "OFF" | "WATCH" | "ON",
-            "score": 0-4,
-            "details": {...},
-            "explanation": "...",
-            "thresholds": {...},
-            "updated_at": "..."
-        }
     """
     score = 0
     updated_at = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
@@ -83,8 +78,8 @@ def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
     thresholds = {
         "total_assets": f"> +{config.TOTAL_ASSETS_INCREASE_THRESHOLD}%",
         "treasury": f"< +{config.TREASURY_HOLDINGS_INCREASE_THRESHOLD}%",
-        "swaps": f">= +{config.SWAPS_SURGE_THRESHOLD}%",
-        "usdjpy": f">= +{config.USDJPY_WEAKENING_THRESHOLD}%"
+        "swaps": f"週次% >= {config.SWAPS_SURGE_THRESHOLD_PCT}% & 増加額 >= {config.SWAPS_SURGE_THRESHOLD_ABS}B | z-score >= {config.SWAPS_SURGE_ZSCORE_THRESHOLD}",
+        "usdjpy": f"円安 >= +{config.USDJPY_WEAKENING_THRESHOLD}% | (>={config.USDJPY_HIGH_LEVEL} & ボラ >= {config.USDJPY_HIGH_VOLATILITY}%)"
     }
 
     # 各条件の詳細情報を初期化
@@ -95,7 +90,8 @@ def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
             "change": None,
             "threshold": config.TOTAL_ASSETS_INCREASE_THRESHOLD,
             "met": False,
-            "reason": "FREDからデータを取得できませんでした"
+            "reason": "FREDからデータを取得できませんでした",
+            "indicators": ["週次%"]
         },
         "treasury": {
             "status": "データ取得失敗",
@@ -103,15 +99,17 @@ def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
             "change": None,
             "threshold": config.TREASURY_HOLDINGS_INCREASE_THRESHOLD,
             "met": False,
-            "reason": "FREDからデータを取得できませんでした"
+            "reason": "FREDからデータを取得できませんでした",
+            "indicators": ["週次%"]
         },
         "swaps": {
             "status": "データ取得失敗",
             "value": None,
             "change": None,
-            "threshold": config.SWAPS_SURGE_THRESHOLD,
+            "threshold": config.SWAPS_SURGE_THRESHOLD_PCT,
             "met": False,
-            "reason": "FREDからデータを取得できませんでした"
+            "reason": "FREDからデータを取得できませんでした",
+            "indicators": ["週次%", "増加額", "z-score"]
         },
         "usdjpy": {
             "status": "データ取得失敗",
@@ -119,12 +117,15 @@ def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
             "change": None,
             "threshold": config.USDJPY_WEAKENING_THRESHOLD,
             "met": False,
-            "reason": "Yahoo Financeからデータを取得できませんでした"
+            "reason": "Yahoo Financeからデータを取得できませんでした",
+            "indicators": ["週次%", "水準", "ボラ"]
         },
     }
 
+    # =========================================
     # 条件1: Total Assets（WALCL）が前週比で増加
     # 判定: change > 0.1% で「FRB資産拡大中」
+    # =========================================
     if walcl_data and walcl_data.get("change") is not None:
         change = walcl_data["change"]
         threshold = config.TOTAL_ASSETS_INCREASE_THRESHOLD
@@ -145,11 +146,14 @@ def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
             "threshold": threshold,
             "met": met,
             "reason": reason,
-            "date": walcl_data.get("date")
+            "date": walcl_data.get("date"),
+            "indicators": ["週次%"]
         }
 
+    # =========================================
     # 条件2: Treasury Holdings（TREAST）が横ばいまたは減少
-    # 判定: change < 0.5% で「国内QE非活発」（=隠れQEの条件成立）
+    # 判定: change < 0.5% で「国内QE非活発」
+    # =========================================
     if treast_data and treast_data.get("change") is not None:
         change = treast_data["change"]
         threshold = config.TREASURY_HOLDINGS_INCREASE_THRESHOLD
@@ -170,63 +174,134 @@ def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
             "threshold": threshold,
             "met": met,
             "reason": reason,
-            "date": treast_data.get("date")
+            "date": treast_data.get("date"),
+            "indicators": ["週次%"]
         }
 
-    # 条件3: Central Bank Swaps（SWPT）が急増
-    # 判定: change >= 10% で「海外へのドル供給急増」
+    # =========================================
+    # 条件3: Central Bank Swaps（SWPT）急増（複合条件）
+    # ノイズ耐性向上:
+    # - 条件A: 週次% >= 10% かつ 週次増加額 >= 5B
+    # - 条件B: z-score >= 2.0（過去52週から2σ超の異常値）
+    # - 注: 値が1B未満の場合は週次%のみでは成立させない
+    # =========================================
     if swpt_data and swpt_data.get("change") is not None:
-        change = swpt_data["change"]
-        threshold = config.SWAPS_SURGE_THRESHOLD
-        met = change >= threshold
+        change_pct = swpt_data["change"]
+        value = swpt_data["value"]
+        value_b = value / 1000 if value else 0  # 百万ドル→10億ドル
+        change_abs = swpt_data.get("change_abs", 0)
+        change_abs_b = change_abs / 1000 if change_abs else 0  # 百万ドル→10億ドル
+        zscore = swpt_data.get("zscore", 0)
+        mean_52w = swpt_data.get("mean_52w", 0)
+        std_52w = swpt_data.get("std_52w", 0)
+
+        # 複合判定
+        met = False
+        met_reasons = []
+
+        # 条件A: 週次% >= 10% かつ 週次増加額 >= 5B（かつ値が1B以上）
+        pct_threshold = config.SWAPS_SURGE_THRESHOLD_PCT
+        abs_threshold = config.SWAPS_SURGE_THRESHOLD_ABS
+        min_value = config.SWAPS_MINIMUM_VALUE
+
+        if value_b >= min_value:
+            if change_pct >= pct_threshold and change_abs_b >= abs_threshold:
+                met = True
+                met_reasons.append(f"週次%({change_pct:+.1f}%)&増加額({change_abs_b:+.1f}B)")
+
+        # 条件B: z-score >= 2.0
+        zscore_threshold = config.SWAPS_SURGE_ZSCORE_THRESHOLD
+        if zscore >= zscore_threshold:
+            met = True
+            met_reasons.append(f"z-score({zscore:+.2f})が{zscore_threshold}超")
 
         if met:
             score += 1
-            reason = f"前週比 {change:+.2f}% >= {threshold}% → ドル供給急増"
+            reason = f"急増検出: {', '.join(met_reasons)}"
             status = "急増"
         else:
-            reason = f"前週比 {change:+.2f}% < {threshold}% → 通常レベル"
+            # 不成立の理由を詳細に
+            reasons = []
+            if value_b < min_value:
+                reasons.append(f"値が小さい({value_b:.1f}B < {min_value}B)")
+            elif change_pct < pct_threshold:
+                reasons.append(f"週次%不足({change_pct:+.1f}% < {pct_threshold}%)")
+            elif change_abs_b < abs_threshold:
+                reasons.append(f"増加額不足({change_abs_b:+.1f}B < {abs_threshold}B)")
+            if zscore < zscore_threshold:
+                reasons.append(f"z-score({zscore:+.2f}) < {zscore_threshold}")
+            reason = f"通常レベル: {', '.join(reasons)}"
             status = "通常"
 
         details["swaps"] = {
             "status": status,
-            "value": swpt_data["value"],
-            "change": change,
-            "threshold": threshold,
+            "value": value,
+            "value_b": value_b,
+            "change": change_pct,
+            "change_abs_b": change_abs_b,
+            "zscore": zscore,
+            "mean_52w": mean_52w,
+            "std_52w": std_52w,
+            "threshold": pct_threshold,
+            "threshold_abs": abs_threshold,
+            "threshold_zscore": zscore_threshold,
             "met": met,
             "reason": reason,
-            "date": swpt_data.get("date")
+            "date": swpt_data.get("date"),
+            "indicators": ["週次%", "増加額", "z-score"]
         }
 
-    # 条件4: USDJPY が円安方向
-    # 判定: change >= 1% で「円安進行」
+    # =========================================
+    # 条件4: USDJPY 円安/介入局面（複合条件）
+    # - 条件A: 週次変化 >= +1%（円安進行）
+    # - 条件B: USDJPY >= 150 かつ ボラ >= 1.5%（高水準&高ボラ）
+    # =========================================
     if usdjpy_data and usdjpy_data.get("change") is not None:
         change = usdjpy_data["change"]
-        threshold = config.USDJPY_WEAKENING_THRESHOLD
-        met = change >= threshold
+        value = usdjpy_data["value"]
+        volatility = abs(change)  # ボラティリティ = 変化率の絶対値
+
+        # 複合判定
+        met = False
+        met_reason = ""
+
+        # 条件A: 円安進行
+        if change >= config.USDJPY_WEAKENING_THRESHOLD:
+            met = True
+            met_reason = f"円安進行: 週次 {change:+.2f}% >= {config.USDJPY_WEAKENING_THRESHOLD}%"
+            status = "円安進行"
+        # 条件B: 高水準 & 高ボラ（介入警戒局面）
+        elif value >= config.USDJPY_HIGH_LEVEL and volatility >= config.USDJPY_HIGH_VOLATILITY:
+            met = True
+            met_reason = f"介入警戒: {value:.1f} >= {config.USDJPY_HIGH_LEVEL} & ボラ {volatility:.2f}% >= {config.USDJPY_HIGH_VOLATILITY}%"
+            status = "介入警戒"
+        else:
+            if change <= -config.USDJPY_WEAKENING_THRESHOLD:
+                met_reason = f"円高進行: 週次 {change:+.2f}%"
+                status = "円高進行"
+            else:
+                met_reason = f"安定推移: 週次 {change:+.2f}%, 水準 {value:.1f}"
+                status = "安定"
 
         if met:
             score += 1
-            reason = f"週次変化 {change:+.2f}% >= {threshold}% → 円安進行中"
-            status = "円安進行"
-        else:
-            if change <= -threshold:
-                reason = f"週次変化 {change:+.2f}% → 円高進行中"
-                status = "円高進行"
-            else:
-                reason = f"週次変化 {change:+.2f}% → 安定推移"
-                status = "安定"
 
         details["usdjpy"] = {
             "status": status,
-            "value": usdjpy_data["value"],
+            "value": value,
             "change": change,
-            "threshold": threshold,
+            "volatility": volatility,
+            "threshold": config.USDJPY_WEAKENING_THRESHOLD,
+            "threshold_level": config.USDJPY_HIGH_LEVEL,
+            "threshold_volatility": config.USDJPY_HIGH_VOLATILITY,
             "met": met,
-            "reason": reason
+            "reason": met_reason,
+            "indicators": ["週次%", "水準", "ボラ"]
         }
 
+    # =========================================
     # シグナル判定（スコアに基づく3段階判定）
+    # =========================================
     if score >= config.HIDDEN_QE_SIGNAL_ON:  # 4点
         signal = "ON"
         explanation = "全4条件成立。日本経由の隠れQEが活発化している可能性が高い。BTCに強気シグナル。"

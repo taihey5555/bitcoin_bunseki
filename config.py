@@ -87,14 +87,23 @@ GOLD_CHANGE_THRESHOLD = 1.0 # 1日の変動率が±これ以上でシグナル
 # Arthur Hayes "Japanese QE Thesis" に基づく
 # ============================================
 
-# --- Central Bank Swaps 急増判定 (前週比%) ---
-# FRBが海外中銀にドルを供給する際に増加
-# 10%以上の週次増加で「急増」と判定
-SWAPS_SURGE_THRESHOLD = 10.0
+# --- Central Bank Swaps 急増判定 ---
+# 複合条件でノイズ耐性を向上:
+# 条件A: 週次変化率 >= 10% かつ 週次増加額 >= 5B（50億ドル）
+# 条件B: z-score >= 2.0（過去52週平均から2σ以上の異常値）
+# 条件C: 値が小さい（<1B）時は週次%のみでは成立させない
+SWAPS_SURGE_THRESHOLD_PCT = 10.0      # 週次変化率閾値 (%)
+SWAPS_SURGE_THRESHOLD_ABS = 5.0       # 週次増加額閾値 (10億ドル = B)
+SWAPS_SURGE_ZSCORE_THRESHOLD = 2.0    # z-score閾値（2σ）
+SWAPS_MINIMUM_VALUE = 1.0             # この値(B)未満の場合は週次%判定を無効化
 
-# --- USDJPY 円安判定 (前週比%) ---
-# 1%以上の上昇で「円安方向に動いている」と判定
-USDJPY_WEAKENING_THRESHOLD = 1.0
+# --- USDJPY 判定 ---
+# 複合条件で介入/スワップ筋の局面を検出:
+# 条件A: 週次変化 >= +1%（円安進行）
+# 条件B: USDJPY >= 150 かつ 週次ボラ（絶対値）>= 1.5%（高水準&高ボラ）
+USDJPY_WEAKENING_THRESHOLD = 1.0      # 円安判定閾値 (週次変化%)
+USDJPY_HIGH_LEVEL = 150.0             # 高水準判定閾値
+USDJPY_HIGH_VOLATILITY = 1.5          # 高ボラ判定閾値 (週次変化の絶対値%)
 
 # --- Total Assets 増加判定 (前週比%) ---
 # 0.1%以上の増加で「増加している」と判定

@@ -273,6 +273,15 @@
             color: #888;
             margin-bottom: 6px;
         }
+        .condition-indicators {
+            font-size: 10px;
+            color: #f7931a;
+            margin-bottom: 6px;
+            padding: 3px 8px;
+            background: rgba(247, 147, 26, 0.1);
+            border-radius: 3px;
+            display: inline-block;
+        }
         .condition-reason {
             font-size: 11px;
             color: #666;
@@ -509,7 +518,8 @@
                         <div class="condition-name">Total Assets 増加</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-current" id="cond-total-assets-current">現在値: 読み込み中...</div>
+                        <div class="condition-indicators" id="cond-total-assets-indicators">採用指標: 週次%</div>
+                        <div class="condition-current" id="cond-total-assets-current">読み込み中...</div>
                         <div class="condition-threshold" id="cond-total-assets-threshold">閾値: 前週比 > +0.1%</div>
                         <div class="condition-reason" id="cond-total-assets-reason">判定理由: 読み込み中...</div>
                     </div>
@@ -521,32 +531,35 @@
                         <div class="condition-name">国内QE非活発</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-current" id="cond-treasury-current">現在値: 読み込み中...</div>
+                        <div class="condition-indicators" id="cond-treasury-indicators">採用指標: 週次%</div>
+                        <div class="condition-current" id="cond-treasury-current">読み込み中...</div>
                         <div class="condition-threshold" id="cond-treasury-threshold">閾値: 前週比 < +0.5%</div>
                         <div class="condition-reason" id="cond-treasury-reason">判定理由: 読み込み中...</div>
                     </div>
                 </div>
-                <!-- 条件3: Swaps -->
+                <!-- 条件3: Swaps（複合条件） -->
                 <div class="condition-item loading" id="cond-swaps">
                     <div class="condition-header">
                         <div class="condition-icon">...</div>
                         <div class="condition-name">Central Bank Swaps 急増</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-current" id="cond-swaps-current">現在値: 読み込み中...</div>
-                        <div class="condition-threshold" id="cond-swaps-threshold">閾値: 前週比 >= +10%</div>
+                        <div class="condition-indicators" id="cond-swaps-indicators">採用指標: 週次% / 増加額 / z-score</div>
+                        <div class="condition-current" id="cond-swaps-current">読み込み中...</div>
+                        <div class="condition-threshold" id="cond-swaps-threshold">閾値: 複合条件</div>
                         <div class="condition-reason" id="cond-swaps-reason">判定理由: 読み込み中...</div>
                     </div>
                 </div>
-                <!-- 条件4: USDJPY -->
+                <!-- 条件4: USDJPY（複合条件） -->
                 <div class="condition-item loading" id="cond-usdjpy">
                     <div class="condition-header">
                         <div class="condition-icon">...</div>
-                        <div class="condition-name">USDJPY 円安進行</div>
+                        <div class="condition-name">USDJPY 円安/介入警戒</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-current" id="cond-usdjpy-current">現在値: 読み込み中...</div>
-                        <div class="condition-threshold" id="cond-usdjpy-threshold">閾値: 週次変化 >= +1%</div>
+                        <div class="condition-indicators" id="cond-usdjpy-indicators">採用指標: 週次% / 水準 / ボラ</div>
+                        <div class="condition-current" id="cond-usdjpy-current">読み込み中...</div>
+                        <div class="condition-threshold" id="cond-usdjpy-threshold">閾値: 複合条件</div>
                         <div class="condition-reason" id="cond-usdjpy-reason">判定理由: 読み込み中...</div>
                     </div>
                 </div>
@@ -614,37 +627,44 @@
                 <p>3. しかし介入後もドルは金融システム内に残留</p>
                 <p>4. 結果として、リスク資産（BTC含む）に追い風</p>
 
-                <h3 style="margin-top: 20px;">判定基準</h3>
+                <h3 style="margin-top: 20px;">判定基準（v2: ノイズ耐性向上）</h3>
                 <table class="criteria-table">
                     <tr>
                         <th>条件</th>
-                        <th>指標</th>
+                        <th>採用指標</th>
                         <th>閾値</th>
                         <th>意味</th>
                     </tr>
                     <tr>
                         <td>Total Assets 増加</td>
-                        <td>WALCL 前週比</td>
+                        <td>週次%</td>
                         <td><code>> +0.1%</code></td>
                         <td>FRB資産が拡大中</td>
                     </tr>
                     <tr>
                         <td>国内QE非活発</td>
-                        <td>TREAST 前週比</td>
+                        <td>週次%</td>
                         <td><code>< +0.5%</code></td>
                         <td>国債買入が目立たない</td>
                     </tr>
                     <tr>
                         <td>Swaps急増</td>
-                        <td>SWPT 前週比</td>
-                        <td><code>>= +10%</code></td>
-                        <td>海外へのドル供給急増</td>
+                        <td>週次% / 増加額 / z-score</td>
+                        <td>
+                            <code>(週次% >= 10% & 増加額 >= 5B)</code><br>
+                            <code>または z-score >= 2.0</code><br>
+                            <span style="color:#888;font-size:10px;">※値<1Bの場合は週次%無効</span>
+                        </td>
+                        <td>ノイズ除去した急増検出</td>
                     </tr>
                     <tr>
-                        <td>円安進行</td>
-                        <td>USDJPY 週次変化</td>
-                        <td><code>>= +1%</code></td>
-                        <td>ドル需要増の兆候</td>
+                        <td>円安/介入警戒</td>
+                        <td>週次% / 水準 / ボラ</td>
+                        <td>
+                            <code>円安: 週次 >= +1%</code><br>
+                            <code>または (>=150 & ボラ >= 1.5%)</code>
+                        </td>
+                        <td>介入筋の動きを捕捉</td>
                     </tr>
                 </table>
             </div>
@@ -666,6 +686,7 @@
             const currentElement = document.getElementById(condId + '-current');
             const thresholdElement = document.getElementById(condId + '-threshold');
             const reasonElement = document.getElementById(condId + '-reason');
+            const indicatorsElement = document.getElementById(condId + '-indicators');
 
             // データがない場合
             if (!data || data.value === null) {
@@ -673,6 +694,7 @@
                 iconElement.textContent = '!';
                 currentElement.textContent = '現在値: データ取得失敗';
                 reasonElement.textContent = data?.reason || 'データを取得できませんでした';
+                if (indicatorsElement) indicatorsElement.textContent = '';
                 return;
             }
 
@@ -681,31 +703,40 @@
             element.className = 'condition-item ' + (met ? 'met' : 'not-met');
             iconElement.textContent = met ? '✓' : '✗';
 
-            // 現在値表示
-            let currentText = '';
-            if (condId === 'cond-usdjpy') {
-                currentText = `現在値: ${data.value?.toFixed(2)} (週次 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%)`;
-            } else {
-                currentText = `現在値: 前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+            // 採用指標表示
+            if (indicatorsElement && data.indicators) {
+                indicatorsElement.textContent = `採用指標: ${data.indicators.join(' / ')}`;
             }
-            currentElement.textContent = currentText;
 
-            // 閾値表示
+            // 現在値表示（条件ごとに詳細化）
+            let currentText = '';
             let thresholdText = '';
+
             switch(condId) {
                 case 'cond-total-assets':
-                    thresholdText = `閾値: 前週比 > +${data.threshold}%`;
+                    currentText = `前週比: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+                    thresholdText = `閾値: > +${data.threshold}%`;
                     break;
                 case 'cond-treasury':
-                    thresholdText = `閾値: 前週比 < +${data.threshold}%`;
+                    currentText = `前週比: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+                    thresholdText = `閾値: < +${data.threshold}%`;
                     break;
                 case 'cond-swaps':
-                    thresholdText = `閾値: 前週比 >= +${data.threshold}%`;
+                    // SWPT: 複合条件の詳細表示
+                    const changeAbs = data.change_abs_b !== undefined ? data.change_abs_b : 0;
+                    const zscore = data.zscore !== undefined ? data.zscore : 0;
+                    currentText = `週次%: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(1)}% | 増加額: ${changeAbs >= 0 ? '+' : ''}${changeAbs?.toFixed(1)}B | z-score: ${zscore >= 0 ? '+' : ''}${zscore?.toFixed(2)}`;
+                    thresholdText = `閾値: (週次% >= ${data.threshold}% & 増加額 >= ${data.threshold_abs}B) または z-score >= ${data.threshold_zscore}`;
                     break;
                 case 'cond-usdjpy':
-                    thresholdText = `閾値: 週次変化 >= +${data.threshold}%`;
+                    // USDJPY: 複合条件の詳細表示
+                    const volatility = data.volatility !== undefined ? data.volatility : Math.abs(data.change);
+                    currentText = `水準: ${data.value?.toFixed(2)} | 週次: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}% | ボラ: ${volatility?.toFixed(2)}%`;
+                    thresholdText = `閾値: 円安 >= +${data.threshold}% または (水準 >= ${data.threshold_level} & ボラ >= ${data.threshold_volatility}%)`;
                     break;
             }
+
+            currentElement.textContent = currentText;
             thresholdElement.textContent = thresholdText;
 
             // 判定理由

@@ -134,6 +134,88 @@ async def get_fred_data_with_change(session: aiohttp.ClientSession, series_id: s
 
     return None
 
+
+async def get_fred_data_with_stats(session: aiohttp.ClientSession, series_id: str) -> Optional[Dict]:
+    """
+    FREDから過去52週分のデータを取得し、統計情報（平均、標準偏差、z-score）を計算
+    SWPT（Central Bank Swaps）のノイズ耐性向上用
+
+    Returns:
+        {
+            "value": 最新値,
+            "prev_value": 前週値,
+            "change": 変化率(%),
+            "change_abs": 週次増加額（絶対値、単位は元データ依存）,
+            "mean_52w": 過去52週平均,
+            "std_52w": 過去52週標準偏差,
+            "zscore": z-score（現在値の異常度）,
+            "date": データ日付
+        }
+    """
+    import statistics
+
+    url = "https://api.stlouisfed.org/fred/series/observations"
+
+    if not config.FRED_API_KEY or config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE":
+        return None
+
+    # 過去400日分のデータを取得（週次データなので約52週分）
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=400)
+
+    params = {
+        "series_id": series_id,
+        "api_key": config.FRED_API_KEY,
+        "file_type": "json",
+        "observation_start": start_date.strftime('%Y-%m-%d'),
+        "observation_end": end_date.strftime('%Y-%m-%d'),
+        "sort_order": "desc",
+    }
+
+    try:
+        data = await _request_handler(session, url, params=params)
+        observations = data.get("observations", [])
+
+        # 有効な値のみ抽出
+        valid_obs = [
+            {"date": obs["date"], "value": float(obs["value"])}
+            for obs in observations
+            if obs["value"] != "."
+        ]
+
+        if len(valid_obs) < 2:
+            return None
+
+        current = valid_obs[0]["value"]
+        previous = valid_obs[1]["value"]
+        change_pct = ((current - previous) / previous * 100) if previous != 0 else 0
+        change_abs = current - previous
+
+        # 過去52週分の統計計算（最大52データポイント）
+        values_52w = [obs["value"] for obs in valid_obs[:52]]
+        mean_52w = statistics.mean(values_52w) if values_52w else 0
+        std_52w = statistics.stdev(values_52w) if len(values_52w) > 1 else 0
+        zscore = (current - mean_52w) / std_52w if std_52w > 0 else 0
+
+        print(f"📡 FRED ({series_id}): {current:,.0f} (前週比: {change_pct:+.2f}%, z-score: {zscore:+.2f})")
+        return {
+            "value": current,
+            "prev_value": previous,
+            "change": change_pct,
+            "change_abs": change_abs,
+            "mean_52w": mean_52w,
+            "std_52w": std_52w,
+            "zscore": zscore,
+            "date": valid_obs[0]["date"],
+            "data_points": len(values_52w)
+        }
+    except DataProviderError as e:
+        print(f"⚠️ FRED取得失敗 ({series_id}): {e}")
+    except Exception as e:
+        print(f"⚠️ FRED統計計算失敗 ({series_id}): {e}")
+
+    return None
+
 async def get_btc_price(session: aiohttp.ClientSession, target_date: Optional[datetime] = None) -> Dict:
     """Yahoo FinanceからBTC価格と変化率を取得"""
     try:
