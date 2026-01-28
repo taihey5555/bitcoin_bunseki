@@ -201,12 +201,42 @@
             .hamburger { display: flex; }
             .page-content { padding: 15px; }
             .page-header h1 { font-size: 22px; }
-            .chart-container { height: 300px; }
-            .current-values { grid-template-columns: 1fr 1fr; }
-            .value-box .value { font-size: 18px; }
+            .page-header p { font-size: 13px; }
+            .card { padding: 18px; border-radius: 12px; margin-bottom: 18px; }
+            .card-title { font-size: 15px; margin-bottom: 15px; }
+            .chart-container { height: 280px; }
+            .current-values {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            .value-box { padding: 15px 10px; }
+            .value-box .label { font-size: 11px; line-height: 1.3; }
+            .value-box .value { font-size: 16px; }
+            .explanation { padding: 15px; }
+            .explanation h3 { font-size: 13px; }
+            .explanation p { font-size: 12px; }
+            .explanation code { font-size: 11px; }
         }
+
         @media (max-width: 480px) {
+            .page-content { padding: 10px; }
+            .page-header { margin-bottom: 20px; }
+            .page-header h1 { font-size: 20px; }
+            .card { padding: 15px; }
+            .current-values {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .value-box { padding: 12px 8px; border-radius: 10px; }
+            .value-box .label { font-size: 10px; margin-bottom: 5px; }
+            .value-box .value { font-size: 14px; }
+            .chart-container { height: 250px; }
+            .explanation p { margin-bottom: 8px; }
+        }
+
+        @media (max-width: 360px) {
             .current-values { grid-template-columns: 1fr; }
+            .value-box .value { font-size: 18px; }
         }
     </style>
 </head>
