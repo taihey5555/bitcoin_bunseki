@@ -17,23 +17,54 @@ def scrape_etf_flow():
         with SB(uc=True, headless=True) as sb:
             print("Opening CoinGlass page...")
             sb.open('https://www.coinglass.com/ja/etf/bitcoin')
-            sb.sleep(12)
+            sb.sleep(8)
 
-            print("Finding table rows...")
-            rows = sb.find_elements('css selector', 'table tr')
-            print(f"Found {len(rows)} rows")
+            # ページ下部にスクロールしてフローテーブルを表示
+            print("Scrolling to find flow table...")
+            sb.execute_script("window.scrollTo(0, document.body.scrollHeight / 2);")
+            sb.sleep(3)
+            sb.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            sb.sleep(5)
 
-            if len(rows) < 3:
-                print("Not enough rows found")
+            # 全てのテーブルを取得
+            tables = sb.find_elements('css selector', 'table')
+            print(f"Found {len(tables)} tables")
+
+            # フローデータを含むテーブルを探す（日付形式の行があるテーブル）
+            flow_rows = []
+            for i, table in enumerate(tables):
+                rows = table.find_elements('css selector', 'tr')
+                table_text = table.text[:200] if table.text else ""
+                print(f"Table {i}: {len(rows)} rows, preview: {table_text[:100]}...")
+
+                # 日付パターンを含むテーブルを探す
+                if '2026-' in table.text or '2025-' in table.text:
+                    print(f"Found flow table at index {i}")
+                    flow_rows = rows
+                    break
+
+            if not flow_rows:
+                # フォールバック: 全テーブルの行を結合
+                print("Flow table not found, checking all tables...")
+                for table in tables:
+                    rows = table.find_elements('css selector', 'tr')
+                    for row in rows:
+                        if row.text and ('2026-' in row.text or '2025-' in row.text):
+                            flow_rows.append(row)
+
+            print(f"Found {len(flow_rows)} potential flow rows")
+
+            if len(flow_rows) < 1:
+                print("No flow rows found")
                 return None
 
             # ETF名の順序（CoinGlassの表示順）
             etf_names = ['GBTC', 'IBIT', 'FBTC', 'ARKB', 'BITB', 'BTCO', 'HODL', 'BRRR', 'EZBC', 'BTCW']
 
-            # 有効なデータがある行を探す（最新から順に）
-            for row in rows[1:15]:
-                text = row.text.strip()
-                print(f"Row text: {text[:100]}...")  # デバッグ用
+            # 有効なデータがある行を探す
+            for row in flow_rows[:15]:
+                text = row.text.strip() if hasattr(row, 'text') else str(row)
+                print(f"Flow row: {text[:150]}...")  # デバッグ用
 
                 # 日付で始まる行を探す
                 if not re.match(r'^\d{4}-\d{2}-\d{2}', text):
