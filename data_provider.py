@@ -154,13 +154,31 @@ async def get_funding_rate(session: aiohttp.ClientSession, target_date: Optional
     if target_date:
         print("⚠️ ファンディングレートの過去データは取得できません。")
         return None
-    # ... (実装は変更なし)
+
+    # Binance APIを試す
     try:
         url = "https://fapi.binance.com/fapi/v1/fundingRate"
         params = {"symbol": "BTCUSDT", "limit": 1}
         data = await _request_handler(session, url, params=params)
-        return float(data[0]["fundingRate"]) * 100 if data else None
-    except Exception as e: return None
+        if data:
+            return float(data[0]["fundingRate"]) * 100
+    except Exception as e:
+        print(f"⚠️ Binance Funding Rate取得失敗: {e}")
+
+    # フォールバック: CoinGlass公開API
+    try:
+        url = "https://open-api.coinglass.com/public/v2/funding"
+        params = {"symbol": "BTC", "time_type": "all"}
+        data = await _request_handler(session, url, params=params)
+        if data and data.get("data"):
+            # 最初のデータ（通常はBinance）を取得
+            rate = data["data"][0].get("rate")
+            if rate:
+                return float(rate) * 100
+    except Exception as e:
+        print(f"⚠️ CoinGlass Funding Rate取得失敗: {e}")
+
+    return None
 
 # ETFフローのキャッシュ（1時間有効）
 _etf_cache = {"data": None, "timestamp": None}
