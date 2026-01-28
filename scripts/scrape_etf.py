@@ -57,64 +57,71 @@ def scrape_etf_flow():
             # 有効なデータがある行を探す
             for row in flow_rows[:15]:
                 text = row.text.strip() if hasattr(row, 'text') else str(row)
-                print(f"Flow row: {text[:150]}...")  # デバッグ用
+                print(f"Flow row: {text[:120]}...")
 
-                # 日付で始まる行を探す
-                if not re.match(r'^\d{4}-\d{2}-\d{2}', text):
+                # 日付を抽出（最初の10文字 YYYY-MM-DD）
+                date_match = re.match(r'^(\d{4}-\d{2}-\d{2})', text)
+                if not date_match:
                     continue
+                date_str = date_match.group(1)
 
-                lines = text.split('\n')
-                date_str = lines[0].strip()
+                # 日付以降のテキストから数値を抽出
+                text_after_date = text[10:]
 
-                # 数値を抽出（+/-付きの小数を含む）
-                numbers = re.findall(r'[+-]?\d+\.?\d*', text)
-                print(f"Found numbers: {numbers}")
+                # "K" を含む数値も処理（例: -505.09K = -505090）
+                # スペースや+/-で区切られた数値を抽出
+                raw_numbers = re.findall(r'[+-]?\s*\d+\.?\d*K?', text_after_date)
 
-                if len(numbers) < 5:
-                    print(f"Not enough numbers in row, skipping...")
-                    continue
-
-                # 全て0の行はスキップ（データなし）
-                non_zero_count = sum(1 for n in numbers if float(n) != 0)
-                if non_zero_count < 2:
-                    print(f"Row has mostly zeros, trying next row...")
-                    continue
-
-                # 数値をパース
                 def parse_value(val_str):
                     try:
+                        val_str = val_str.replace(' ', '').replace('+', '')
+                        if 'K' in val_str.upper():
+                            return float(val_str.upper().replace('K', '')) * 1000
                         return float(val_str)
                     except:
                         return 0
 
-                # 最後の3つは合計値（日次、週次、月次）
-                # その前がETF個別の値
-                if len(numbers) >= 13:  # 日付の数字 + ETF10個 + 合計3個くらい
-                    # 日付部分を除く（YYYY-MM-DD = 3つの数字）
-                    values = numbers[3:]  # 日付以降
+                numbers = [parse_value(n) for n in raw_numbers if n.strip() not in ['', '-', '+']]
+                print(f"Parsed numbers: {numbers[:15]}...")
 
-                    # 最後の3つが合計
-                    if len(values) >= 3:
-                        daily_total = parse_value(values[-3])  # 日次合計
+                if len(numbers) < 3:
+                    print(f"Not enough numbers, skipping...")
+                    continue
 
-                        # ETF個別フロー（最後の3つを除く）
-                        etf_values = values[:-3]
-                        etf_flows = []
+                # 0ばかりの行はスキップ
+                non_zero = [n for n in numbers if n != 0]
+                if len(non_zero) < 1:
+                    print(f"All zeros, trying next row...")
+                    continue
 
-                        for i, name in enumerate(etf_names):
-                            if i < len(etf_values):
-                                flow = parse_value(etf_values[i])
-                                if flow != 0:
-                                    etf_flows.append({"symbol": name, "daily_flow": flow})
+                # 最後の値が日次合計（または最後から3番目）
+                # CoinGlassの構造: [ETF1, ETF2, ..., ETF10, 日次合計, 週次, 月次]
+                # ただし週次・月次がない場合もある
+                if len(numbers) >= 11:
+                    # 最後の1〜3個が合計系
+                    daily_total = numbers[-1]  # 最後が日次合計の可能性
 
-                        print(f"Daily total: {daily_total}, ETF flows: {etf_flows}")
+                    # ETF個別フロー（最後の1個を除く、最大10個）
+                    etf_values = numbers[:-1][:10]
+                else:
+                    daily_total = numbers[-1]
+                    etf_values = numbers[:-1]
 
-                        return {
-                            "total_daily_flow": daily_total,
-                            "date": date_str,
-                            "top_flows": sorted(etf_flows, key=lambda x: abs(x["daily_flow"]), reverse=True)[:5],
-                            "updated_at": datetime.now().isoformat()
-                        }
+                etf_flows = []
+                for i, name in enumerate(etf_names):
+                    if i < len(etf_values):
+                        flow = etf_values[i]
+                        if flow != 0:
+                            etf_flows.append({"symbol": name, "daily_flow": flow})
+
+                print(f"Date: {date_str}, Daily total: {daily_total}, Top flows: {etf_flows[:3]}")
+
+                return {
+                    "total_daily_flow": daily_total,
+                    "date": date_str,
+                    "top_flows": sorted(etf_flows, key=lambda x: abs(x["daily_flow"]), reverse=True)[:5],
+                    "updated_at": datetime.now().isoformat()
+                }
 
             print("No valid data row found")
             return None
