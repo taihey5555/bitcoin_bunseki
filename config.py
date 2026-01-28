@@ -82,3 +82,31 @@ FEAR_GREED_GREED = 60         # これ以上で貪欲 (弱気 x1)
 # --- Gold 変動率 (%) ---
 GOLD_CHANGE_THRESHOLD = 1.0 # 1日の変動率が±これ以上でシグナル
 
+# ============================================
+# 隠れQE（日本経由）シグナル判定閾値
+# Arthur Hayes "Japanese QE Thesis" に基づく
+# ============================================
+
+# --- Central Bank Swaps 急増判定 (前週比%) ---
+# FRBが海外中銀にドルを供給する際に増加
+# 10%以上の週次増加で「急増」と判定
+SWAPS_SURGE_THRESHOLD = 10.0
+
+# --- USDJPY 円安判定 (前週比%) ---
+# 1%以上の上昇で「円安方向に動いている」と判定
+USDJPY_WEAKENING_THRESHOLD = 1.0
+
+# --- Total Assets 増加判定 (前週比%) ---
+# 0.1%以上の増加で「増加している」と判定
+TOTAL_ASSETS_INCREASE_THRESHOLD = 0.1
+
+# --- Treasury Holdings 増加判定 (前週比%) ---
+# 0.5%以上の増加で「国内QE活発」と判定（逆に、これ以下なら「目立たない」）
+TREASURY_HOLDINGS_INCREASE_THRESHOLD = 0.5
+
+# --- 隠れQEシグナル判定スコア閾値 ---
+# 4条件の合計スコアで判定
+HIDDEN_QE_SIGNAL_ON = 4       # 4点: ON（強いシグナル）
+HIDDEN_QE_SIGNAL_WATCH = 2    # 2-3点: WATCH（注視）
+# 0-1点: OFF（シグナルなし）
+

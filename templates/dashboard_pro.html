@@ -210,6 +210,7 @@
             <ul class="navbar-menu">
                 <li><a href="/" class="active">Dashboard</a></li>
                 <li><a href="/liquidity">USD流動性</a></li>
+                <li><a href="/foreign-liquidity">海外流動性</a></li>
             </ul>
             <div class="hamburger" onclick="toggleMenu()">
                 <span></span>
@@ -223,6 +224,7 @@
     <div class="mobile-menu" id="mobileMenu">
         <a href="/" class="active">Dashboard</a>
         <a href="/liquidity">USD流動性</a>
+        <a href="/foreign-liquidity">海外流動性</a>
     </div>
 
     <div class="page-content">
@@ -304,6 +306,11 @@
                         <div class="logic-name">ETFフロー</div>
                         <div class="logic-desc">機関投資家の資金動向。純流入は需要増、純流出は売り圧力。</div>
                         <div class="logic-threshold">強気: >$100M / 弱気: <-$100M</div>
+                    </div>
+                    <div class="logic-item" style="border-left-color: #f7931a;">
+                        <div class="logic-name">隠れQE（Hayes Thesis）</div>
+                        <div class="logic-desc">FRBが日本市場を使った隠れた量的緩和の兆候を検出。4条件：Total Assets増加、国内QE非活発、Swaps急増、円安進行。</div>
+                        <div class="logic-threshold">ON: 4/4条件 / WATCH: 2-3条件 / OFF: 0-1条件</div>
                     </div>
                 </div>
                 <div class="logic-formula">

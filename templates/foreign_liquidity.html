@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>海外流動性 / 隠れQE - BTC Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%); color: #fff; min-height: 100vh; }
+
+        /* ナビゲーション（共通） */
+        .navbar {
+            background: rgba(10, 10, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+        .navbar-menu {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+        .navbar-menu a {
+            color: #aaa;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        .navbar-menu a:hover, .navbar-menu a.active {
+            color: #4facfe;
+        }
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 5px;
+        }
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: #fff;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+        .hamburger.active span:nth-child(2) { opacity: 0; }
+        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(7px, -7px); }
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            background: rgba(10, 10, 26, 0.98);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            z-index: 999;
+        }
+        .mobile-menu.active { display: block; }
+        .mobile-menu a {
+            display: block;
+            color: #aaa;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .mobile-menu a:hover, .mobile-menu a.active { color: #4facfe; }
+
+        /* ページコンテンツ */
+        .page-content {
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .page-header {
+            margin-bottom: 30px;
+        }
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #f7931a, #ffd93d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .page-header p {
+            color: #888;
+            font-size: 14px;
+        }
+
+        /* カード */
+        .card {
+            background: rgba(20, 20, 40, 0.8);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f7931a;
+            margin-bottom: 20px;
+        }
+
+        /* シグナル表示 */
+        .signal-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            margin-bottom: 25px;
+        }
+        .signal-badge {
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 24px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .signal-badge.off {
+            background: rgba(150, 150, 150, 0.2);
+            color: #999;
+            border: 2px solid #666;
+        }
+        .signal-badge.watch {
+            background: rgba(255, 217, 61, 0.2);
+            color: #ffd93d;
+            border: 2px solid #ffd93d;
+            box-shadow: 0 0 20px rgba(255, 217, 61, 0.3);
+        }
+        .signal-badge.on {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+            border: 2px solid #2ed573;
+            box-shadow: 0 0 30px rgba(46, 213, 115, 0.4);
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(46, 213, 115, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(46, 213, 115, 0.6); }
+        }
+        .signal-score {
+            font-size: 18px;
+            color: #888;
+        }
+        .signal-explanation {
+            text-align: center;
+            color: #aaa;
+            font-size: 14px;
+            margin-top: 15px;
+            line-height: 1.6;
+        }
+
+        /* 条件チェックリスト */
+        .condition-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .condition-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            border-left: 3px solid #666;
+        }
+        .condition-item.met {
+            border-left-color: #2ed573;
+            background: rgba(46, 213, 115, 0.1);
+        }
+        .condition-item.not-met {
+            border-left-color: #ff4757;
+        }
+        .condition-icon {
+            font-size: 18px;
+            margin-right: 12px;
+        }
+        .condition-text {
+            flex: 1;
+        }
+        .condition-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 3px;
+        }
+        .condition-value {
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* 現在値表示 */
+        .current-values {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .value-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .value-box .label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .value-box .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #f7931a;
+        }
+        .value-box .change {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .value-box .change.positive { color: #2ed573; }
+        .value-box .change.negative { color: #ff4757; }
+
+        /* チャート */
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-bottom: 20px;
+        }
+
+        /* 説明 */
+        .explanation {
+            background: rgba(247, 147, 26, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            border-left: 4px solid #f7931a;
+        }
+        .explanation h3 {
+            font-size: 15px;
+            color: #f7931a;
+            margin-bottom: 12px;
+        }
+        .explanation p {
+            font-size: 13px;
+            color: #aaa;
+            line-height: 1.7;
+            margin-bottom: 10px;
+        }
+        .explanation strong {
+            color: #fff;
+        }
+        .explanation code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #ffd93d;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #888;
+        }
+
+        /* Arthur Hayes引用 */
+        .quote-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #f7931a;
+            font-style: italic;
+        }
+        .quote-box p {
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .quote-box .author {
+            color: #f7931a;
+            font-style: normal;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .navbar-menu { display: none; }
+            .hamburger { display: flex; }
+            .page-content { padding: 15px; }
+            .page-header h1 { font-size: 22px; }
+            .signal-display { flex-direction: column; padding: 20px; }
+            .signal-badge { font-size: 20px; padding: 10px 25px; }
+            .condition-list { grid-template-columns: 1fr; }
+            .current-values { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .value-box { padding: 15px; }
+            .value-box .value { font-size: 16px; }
+            .chart-container { height: 280px; }
+        }
+
+        @media (max-width: 480px) {
+            .page-content { padding: 10px; }
+            .card { padding: 15px; }
+            .signal-badge { font-size: 18px; padding: 8px 20px; }
+            .current-values { gap: 10px; }
+            .value-box { padding: 12px 8px; }
+            .value-box .label { font-size: 10px; }
+            .value-box .value { font-size: 14px; }
+            .chart-container { height: 250px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">BTC Analysis</a>
+            <ul class="navbar-menu">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/liquidity">USD流動性</a></li>
+                <li><a href="/foreign-liquidity" class="active">海外流動性</a></li>
+            </ul>
+            <div class="hamburger" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="/">Dashboard</a>
+        <a href="/liquidity">USD流動性</a>
+        <a href="/foreign-liquidity" class="active">海外流動性</a>
+    </div>
+
+    <div class="page-content">
+        <div class="page-header">
+            <h1>海外流動性 / 隠れQE検出</h1>
+            <p>FRBが日本市場を使って隠れた量的緩和を行っている兆候を検出</p>
+        </div>
+
+        <!-- シグナル表示 -->
+        <div class="card">
+            <div class="card-title">隠れQEシグナル</div>
+            <div class="signal-display">
+                <div id="signal-badge" class="signal-badge off">OFF</div>
+                <div id="signal-score" class="signal-score">0/4 条件成立</div>
+            </div>
+            <div id="signal-explanation" class="signal-explanation">データを読み込み中...</div>
+        </div>
+
+        <!-- 条件チェックリスト -->
+        <div class="card">
+            <div class="card-title">判定条件チェック</div>
+            <div class="condition-list" id="condition-list">
+                <div class="condition-item" id="cond-total-assets">
+                    <div class="condition-icon">-</div>
+                    <div class="condition-text">
+                        <div class="condition-name">Total Assets 増加</div>
+                        <div class="condition-value" id="cond-total-assets-value">--</div>
+                    </div>
+                </div>
+                <div class="condition-item" id="cond-treasury">
+                    <div class="condition-icon">-</div>
+                    <div class="condition-text">
+                        <div class="condition-name">国内QE非活発</div>
+                        <div class="condition-value" id="cond-treasury-value">--</div>
+                    </div>
+                </div>
+                <div class="condition-item" id="cond-swaps">
+                    <div class="condition-icon">-</div>
+                    <div class="condition-text">
+                        <div class="condition-name">Central Bank Swaps 急増</div>
+                        <div class="condition-value" id="cond-swaps-value">--</div>
+                    </div>
+                </div>
+                <div class="condition-item" id="cond-usdjpy">
+                    <div class="condition-icon">-</div>
+                    <div class="condition-text">
+                        <div class="condition-name">USDJPY 円安進行</div>
+                        <div class="condition-value" id="cond-usdjpy-value">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 現在値 -->
+        <div class="card">
+            <div class="card-title">FRBバランスシート構成要素</div>
+            <div class="current-values">
+                <div class="value-box">
+                    <div class="label">Total Assets (WALCL)</div>
+                    <div class="value" id="walcl-value">--</div>
+                    <div class="change" id="walcl-change">--</div>
+                </div>
+                <div class="value-box">
+                    <div class="label">Treasury Holdings (TREAST)</div>
+                    <div class="value" id="treast-value">--</div>
+                    <div class="change" id="treast-change">--</div>
+                </div>
+                <div class="value-box">
+                    <div class="label">Central Bank Swaps (SWPT)</div>
+                    <div class="value" id="swpt-value">--</div>
+                    <div class="change" id="swpt-change">--</div>
+                </div>
+                <div class="value-box">
+                    <div class="label">USDJPY</div>
+                    <div class="value" id="usdjpy-value">--</div>
+                    <div class="change" id="usdjpy-change">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- チャート -->
+        <div class="card">
+            <div class="card-title">Central Bank Swaps 推移（過去1年）</div>
+            <div class="chart-container">
+                <canvas id="swapsChart"></canvas>
+            </div>
+            <div id="chartLoading" class="loading">チャートデータを読み込み中...</div>
+        </div>
+
+        <!-- 説明 -->
+        <div class="card">
+            <div class="explanation">
+                <h3>Arthur Hayes "Japanese QE Thesis" とは？</h3>
+                <div class="quote-box">
+                    <p>"The Fed cannot openly do QE because of inflation optics. But they can achieve the same effect through currency swaps with the BOJ, allowing Japan to intervene in FX markets while effectively injecting dollars into the global system."</p>
+                    <div class="author">- Arthur Hayes (BitMEX創設者)</div>
+                </div>
+                <p><strong>背景:</strong> FRBは公式にはQT（量的引き締め）を継続中ですが、日銀との通貨スワップを通じて、実質的なドル供給を行っている可能性があります。</p>
+                <p><strong>メカニズム:</strong></p>
+                <p>1. FRBが日銀にドルを供給（Central Bank Swaps増加）</p>
+                <p>2. 日銀がそのドルで為替介入（円買い・ドル売り）</p>
+                <p>3. しかし介入後もドルは金融システム内に残留</p>
+                <p>4. 結果として、リスク資産（BTC含む）に追い風</p>
+                <p><strong>判定条件:</strong></p>
+                <p><code>Total Assets増加</code> + <code>国内QE非活発</code> + <code>Swaps急増</code> + <code>円安進行</code></p>
+                <p>4条件全て成立で <strong>ON</strong>、2-3条件で <strong>WATCH</strong>、0-1条件で <strong>OFF</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            document.querySelector('.hamburger').classList.toggle('active');
+            document.getElementById('mobileMenu').classList.toggle('active');
+        }
+
+        let chart = null;
+
+        async function loadData() {
+            try {
+                // ダッシュボードAPIからシグナルデータを取得
+                const dataRes = await fetch('/api/data');
+                const data = await dataRes.json();
+
+                // 隠れQEシグナルを探す
+                const hiddenQeSignal = data.signals?.find(s => s.name === '隠れQE');
+                if (hiddenQeSignal && hiddenQeSignal.details) {
+                    const qe = hiddenQeSignal.details;
+
+                    // シグナルバッジ更新
+                    const badge = document.getElementById('signal-badge');
+                    badge.textContent = qe.signal;
+                    badge.className = 'signal-badge ' + qe.signal.toLowerCase();
+
+                    document.getElementById('signal-score').textContent = `${qe.score}/4 条件成立`;
+                    document.getElementById('signal-explanation').textContent = qe.explanation;
+
+                    // 条件チェックリスト更新
+                    updateCondition('cond-total-assets', qe.details.total_assets, 'total_assets');
+                    updateCondition('cond-treasury', qe.details.treasury, 'treasury');
+                    updateCondition('cond-swaps', qe.details.swaps, 'swaps');
+                    updateCondition('cond-usdjpy', qe.details.usdjpy, 'usdjpy');
+
+                    // 現在値更新
+                    if (qe.details.total_assets.value) {
+                        document.getElementById('walcl-value').textContent = `$${(qe.details.total_assets.value / 1e6).toFixed(2)}T`;
+                        updateChange('walcl-change', qe.details.total_assets.change);
+                    }
+                    if (qe.details.treasury.value) {
+                        document.getElementById('treast-value').textContent = `$${(qe.details.treasury.value / 1e6).toFixed(2)}T`;
+                        updateChange('treast-change', qe.details.treasury.change);
+                    }
+                    if (qe.details.swaps.value) {
+                        document.getElementById('swpt-value').textContent = `$${(qe.details.swaps.value / 1e3).toFixed(1)}B`;
+                        updateChange('swpt-change', qe.details.swaps.change);
+                    }
+                    if (qe.details.usdjpy.value) {
+                        document.getElementById('usdjpy-value').textContent = qe.details.usdjpy.value.toFixed(2);
+                        updateChange('usdjpy-change', qe.details.usdjpy.change);
+                    }
+                }
+
+                // 履歴データを取得してチャート描画
+                const historyRes = await fetch('/api/foreign-liquidity-history');
+                const historyData = await historyRes.json();
+
+                document.getElementById('chartLoading').style.display = 'none';
+                renderChart(historyData);
+
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('signal-explanation').textContent = 'データの読み込みに失敗しました';
+                document.getElementById('chartLoading').textContent = 'チャートの読み込みに失敗しました';
+            }
+        }
+
+        function updateCondition(elementId, data, type) {
+            const element = document.getElementById(elementId);
+            const valueElement = document.getElementById(elementId + '-value');
+            const iconElement = element.querySelector('.condition-icon');
+
+            if (!data || data.value === null) {
+                iconElement.textContent = '-';
+                valueElement.textContent = 'データなし';
+                return;
+            }
+
+            let isMet = false;
+            let valueText = '';
+
+            switch(type) {
+                case 'total_assets':
+                    isMet = data.status === '増加';
+                    valueText = `前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+                    break;
+                case 'treasury':
+                    isMet = data.status === '非活発';
+                    valueText = `前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+                    break;
+                case 'swaps':
+                    isMet = data.status === '急増';
+                    valueText = `前週比 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+                    break;
+                case 'usdjpy':
+                    isMet = data.status === '円安進行';
+                    valueText = `${data.value?.toFixed(2)} (週次 ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%)`;
+                    break;
+            }
+
+            element.className = 'condition-item ' + (isMet ? 'met' : 'not-met');
+            iconElement.textContent = isMet ? '✓' : '✗';
+            valueElement.textContent = valueText;
+        }
+
+        function updateChange(elementId, change) {
+            const element = document.getElementById(elementId);
+            if (change === null || change === undefined) {
+                element.textContent = '--';
+                return;
+            }
+            element.textContent = `週次 ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+            element.className = 'change ' + (change >= 0 ? 'positive' : 'negative');
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('swapsChart').getContext('2d');
+
+            const swapsData = data.swpt?.map(d => ({ x: d.date, y: d.value / 1e3 })) || []; // 10億ドル単位
+
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Central Bank Swaps (10億ドル)',
+                        data: swapsData,
+                        borderColor: '#f7931a',
+                        backgroundColor: 'rgba(247, 147, 26, 0.15)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(20, 20, 40, 0.9)',
+                            titleColor: '#fff',
+                            bodyColor: '#aaa',
+                            callbacks: {
+                                label: function(context) {
+                                    return `$${context.parsed.y.toFixed(1)}B`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'month', displayFormats: { month: 'yyyy/MM' } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#888' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#888',
+                                callback: function(value) { return '$' + value.toFixed(0) + 'B'; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

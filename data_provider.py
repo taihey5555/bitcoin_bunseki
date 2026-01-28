@@ -70,6 +70,70 @@ async def get_fred_data(session: aiohttp.ClientSession, series_id: str, target_d
     print(f"⚠️ FRED取得失敗 ({series_id}): データが見つかりませんでした。")
     return None
 
+
+async def get_fred_data_with_change(session: aiohttp.ClientSession, series_id: str) -> Optional[Dict]:
+    """
+    FREDから最新データと前週比変化率を取得
+    隠れQE判定用: 週次データの比較が必要
+
+    Returns:
+        {"value": 最新値, "prev_value": 前週値, "change": 変化率(%)}
+    """
+    url = "https://api.stlouisfed.org/fred/series/observations"
+
+    if not config.FRED_API_KEY or config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE":
+        return None
+
+    # 過去30日分のデータを取得（週次データなので4-5点取得できる）
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+
+    params = {
+        "series_id": series_id,
+        "api_key": config.FRED_API_KEY,
+        "file_type": "json",
+        "observation_start": start_date.strftime('%Y-%m-%d'),
+        "observation_end": end_date.strftime('%Y-%m-%d'),
+        "sort_order": "desc",
+        "limit": 5  # 直近5データポイントを取得
+    }
+
+    try:
+        data = await _request_handler(session, url, params=params)
+        observations = data.get("observations", [])
+
+        # 有効な値のみ抽出
+        valid_obs = [
+            {"date": obs["date"], "value": float(obs["value"])}
+            for obs in observations
+            if obs["value"] != "."
+        ]
+
+        if len(valid_obs) >= 2:
+            current = valid_obs[0]["value"]
+            previous = valid_obs[1]["value"]
+            change = ((current - previous) / previous * 100) if previous != 0 else 0
+
+            print(f"📡 FRED ({series_id}): {current:,.0f} (前週比: {change:+.2f}%)")
+            return {
+                "value": current,
+                "prev_value": previous,
+                "change": change,
+                "date": valid_obs[0]["date"]
+            }
+        elif len(valid_obs) == 1:
+            print(f"📡 FRED ({series_id}): {valid_obs[0]['value']:,.0f} (前週データなし)")
+            return {
+                "value": valid_obs[0]["value"],
+                "prev_value": None,
+                "change": 0,
+                "date": valid_obs[0]["date"]
+            }
+    except DataProviderError as e:
+        print(f"⚠️ FRED取得失敗 ({series_id}): {e}")
+
+    return None
+
 async def get_btc_price(session: aiohttp.ClientSession, target_date: Optional[datetime] = None) -> Dict:
     """Yahoo FinanceからBTC価格と変化率を取得"""
     try:
@@ -140,6 +204,35 @@ async def get_dxy(session: aiohttp.ClientSession, target_date: Optional[datetime
         return {"value": closes[-1], "change": change}
     except (KeyError, IndexError) as e:
         print(f"⚠️ DXY取得失敗: {e}")
+        return None
+
+
+async def get_usdjpy(session: aiohttp.ClientSession, target_date: Optional[datetime] = None) -> Optional[Dict]:
+    """
+    Yahoo FinanceからUSDJPYレートを取得
+    日本経由の隠れQE判定に使用
+    円安（USDJPY上昇）はドル供給の兆候
+    """
+    try:
+        # 5日分のデータを取得して週次変化率を計算
+        data = await _get_yahoo_finance_range(session, "JPY=X", 7)
+        if not data:
+            return None
+
+        indicators = data.get("chart", {}).get("result", [{}])[0].get("indicators", {}).get("quote", [{}])[0]
+        closes = [c for c in indicators.get("close", []) if c is not None]
+
+        if not closes:
+            return None
+
+        # 最新値と変化率を計算
+        current = closes[-1]
+        change = ((closes[-1] - closes[0]) / closes[0] * 100) if len(closes) > 1 else 0
+
+        print(f"📡 USDJPY: {current:.2f} (週次変化: {change:+.2f}%)")
+        return {"value": current, "change": change}
+    except (KeyError, IndexError) as e:
+        print(f"⚠️ USDJPY取得失敗: {e}")
         return None
 
 async def _get_yahoo_finance_range(session: aiohttp.ClientSession, symbol: str, days: int = 5):

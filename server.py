@@ -37,9 +37,108 @@ async def fetch_all_data():
             data_provider.get_fear_greed_index(session),
             data_provider.get_funding_rate(session),
             data_provider.get_etf_flow(session),
+            # 隠れQE判定用データ（週次変化率付き）
+            data_provider.get_fred_data_with_change(session, "WALCL"),   # Total Assets
+            data_provider.get_fred_data_with_change(session, "SWPT"),    # Central Bank Swaps
+            data_provider.get_fred_data_with_change(session, "TREAST"),  # Treasury Holdings
+            data_provider.get_usdjpy(session),                           # USDJPY
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
     return results
+
+
+def calculate_hidden_qe_signal(walcl_data, swpt_data, treast_data, usdjpy_data):
+    """
+    隠れQE（日本経由）シグナルを計算
+
+    Arthur Hayes "Japanese QE Thesis":
+    FRBが直接的なQEを行わずに、日本市場を経由して
+    ドル流動性を供給している兆候を検出
+
+    判定条件:
+    1. Total Assets（WALCL）が前週比で増加
+    2. Treasury Holdings（TREAST）が横ばいまたは減少（国内QE非活発）
+    3. Central Bank Swaps（SWPT）が前週比10%以上急増
+    4. USDJPYが前週比1%以上上昇（円安方向）
+
+    Returns:
+        {
+            "signal": "OFF" | "WATCH" | "ON",
+            "score": 0-4,
+            "details": {...},
+            "explanation": "..."
+        }
+    """
+    score = 0
+    details = {
+        "total_assets": {"status": "N/A", "value": None, "change": None},
+        "treasury": {"status": "N/A", "value": None, "change": None},
+        "swaps": {"status": "N/A", "value": None, "change": None},
+        "usdjpy": {"status": "N/A", "value": None, "change": None},
+    }
+
+    # 条件1: Total Assets が増加
+    if walcl_data and walcl_data.get("change") is not None:
+        change = walcl_data["change"]
+        details["total_assets"] = {
+            "value": walcl_data["value"],
+            "change": change,
+            "status": "増加" if change > config.TOTAL_ASSETS_INCREASE_THRESHOLD else "横ばい/減少"
+        }
+        if change > config.TOTAL_ASSETS_INCREASE_THRESHOLD:
+            score += 1
+
+    # 条件2: Treasury Holdings が横ばいまたは減少（国内QE非活発）
+    if treast_data and treast_data.get("change") is not None:
+        change = treast_data["change"]
+        details["treasury"] = {
+            "value": treast_data["value"],
+            "change": change,
+            "status": "非活発" if change < config.TREASURY_HOLDINGS_INCREASE_THRESHOLD else "活発"
+        }
+        # 国内QEが目立たない = Treasury増加が閾値以下
+        if change < config.TREASURY_HOLDINGS_INCREASE_THRESHOLD:
+            score += 1
+
+    # 条件3: Central Bank Swaps が急増
+    if swpt_data and swpt_data.get("change") is not None:
+        change = swpt_data["change"]
+        details["swaps"] = {
+            "value": swpt_data["value"],
+            "change": change,
+            "status": "急増" if change >= config.SWAPS_SURGE_THRESHOLD else "通常"
+        }
+        if change >= config.SWAPS_SURGE_THRESHOLD:
+            score += 1
+
+    # 条件4: USDJPY が円安方向
+    if usdjpy_data and usdjpy_data.get("change") is not None:
+        change = usdjpy_data["change"]
+        details["usdjpy"] = {
+            "value": usdjpy_data["value"],
+            "change": change,
+            "status": "円安進行" if change >= config.USDJPY_WEAKENING_THRESHOLD else "安定/円高"
+        }
+        if change >= config.USDJPY_WEAKENING_THRESHOLD:
+            score += 1
+
+    # シグナル判定
+    if score >= config.HIDDEN_QE_SIGNAL_ON:
+        signal = "ON"
+        explanation = "全条件成立。日本経由の隠れQEが活発化している可能性が高い。BTCに強気シグナル。"
+    elif score >= config.HIDDEN_QE_SIGNAL_WATCH:
+        signal = "WATCH"
+        explanation = f"{score}/4条件成立。隠れQEの兆候あり。動向を注視。"
+    else:
+        signal = "OFF"
+        explanation = "条件未成立。現時点で隠れQEの明確な兆候なし。"
+
+    return {
+        "signal": signal,
+        "score": score,
+        "details": details,
+        "explanation": explanation
+    }
 
 
 @app.route('/')
@@ -92,6 +191,58 @@ def get_liquidity_history():
     })
 
 
+@app.route('/api/foreign-liquidity-history')
+def get_foreign_liquidity_history():
+    """
+    過去1年分の海外向け流動性データを取得
+    隠れQE分析用
+
+    取得データ:
+    - SWPT: Central Bank Liquidity Swaps（海外中銀へのドル供給）
+    - WALCL: Total Assets（FRB総資産）
+    - TREAST: Treasury Holdings（国債保有、国内QE指標）
+    """
+    import requests
+    from datetime import timedelta
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
+
+    def fetch_fred_series(series_id):
+        url = "https://api.stlouisfed.org/fred/series/observations"
+        params = {
+            "series_id": series_id,
+            "api_key": config.FRED_API_KEY,
+            "file_type": "json",
+            "observation_start": start_date.strftime('%Y-%m-%d'),
+            "observation_end": end_date.strftime('%Y-%m-%d'),
+        }
+        try:
+            resp = requests.get(url, params=params, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                return [
+                    {"date": obs["date"], "value": float(obs["value"])}
+                    for obs in data.get("observations", [])
+                    if obs["value"] != "."
+                ]
+        except Exception as e:
+            print(f"FRED履歴取得エラー ({series_id}): {e}")
+        return []
+
+    return jsonify({
+        "swpt": fetch_fred_series("SWPT"),       # Central Bank Swaps
+        "walcl": fetch_fred_series("WALCL"),     # Total Assets
+        "treast": fetch_fred_series("TREAST"),   # Treasury Holdings
+    })
+
+
+@app.route('/foreign-liquidity')
+def foreign_liquidity_page():
+    """海外向け流動性（隠れQE）チャートページを配信する"""
+    return render_template('foreign_liquidity.html')
+
+
 @app.route('/api/data')
 def get_data():
     """ダッシュボード用のデータを取得・計算してJSONで返す"""
@@ -103,7 +254,8 @@ def get_data():
         results = asyncio.run(fetch_all_data())
 
         # エラーが発生した場合はNoneを設定
-        balance_sheet, rrp, tga, dxy, ex_flow, macro_yh, btc, fg, fr, etf_flow = [
+        (balance_sheet, rrp, tga, dxy, ex_flow, macro_yh, btc, fg, fr, etf_flow,
+         walcl_weekly, swpt_data, treast_data, usdjpy_data) = [
             res if not isinstance(res, Exception) else None for res in results
         ]
 
@@ -202,6 +354,27 @@ def get_data():
                 elif flow <= config.ETF_FLOW_BEARISH_WEAK:
                     sig_etf["status"] = "bearish"
         signals.append(sig_etf)
+
+        # 隠れQE（日本経由）シグナル
+        # Arthur Hayes Thesis: FRBが日本市場を使って隠れた量的緩和を行っている兆候
+        hidden_qe = calculate_hidden_qe_signal(walcl_weekly, swpt_data, treast_data, usdjpy_data)
+
+        sig_hidden_qe = {
+            "name": "隠れQE",
+            "status": "neutral",
+            "weight": 1,
+            "value": f"{hidden_qe['signal']} ({hidden_qe['score']}/4)",
+            "details": hidden_qe
+        }
+
+        # シグナルに応じてステータスを設定
+        if hidden_qe["signal"] == "ON":
+            sig_hidden_qe.update({"status": "bullish", "weight": 2})
+        elif hidden_qe["signal"] == "WATCH":
+            sig_hidden_qe["status"] = "bullish"
+        # OFF の場合は neutral のまま
+
+        signals.append(sig_hidden_qe)
 
         bull_w = sum(s["weight"] for s in signals if s["status"] == "bullish")
         bear_w = sum(s["weight"] for s in signals if s["status"] == "bearish")
