@@ -66,11 +66,11 @@ def scrape_etf_flow():
                 date_str = date_match.group(1)
 
                 # "-" が多い行はスキップ（データなしの行）
-                # 単独の "-" をカウント（"-50" のような負の数ではなく）
-                dash_count = len(re.findall(r'(?<!\d)-(?!\d)', text))
+                # "- " または " -" のパターンをカウント
+                dash_count = text.count(' - ') + text.count('- ') + text.count(' -\n')
                 print(f"Dash count (no data indicators): {dash_count}")
-                if dash_count >= 5:
-                    print(f"Too many no-data indicators, skipping...")
+                if dash_count >= 3:
+                    print(f"Too many no-data indicators ({dash_count}), skipping...")
                     continue
 
                 # 日付以降のテキストから数値を抽出
@@ -94,6 +94,13 @@ def scrape_etf_flow():
 
                 if len(numbers) < 10:
                     print(f"Not enough numbers ({len(numbers)}), skipping...")
+                    continue
+
+                # ユニークな非ゼロ値が2個未満の行はスキップ
+                # (同じ値が2回出るだけの行はパースエラーの可能性が高い)
+                non_zero_unique = set(n for n in numbers if n != 0)
+                if len(non_zero_unique) < 2:
+                    print(f"Only {len(non_zero_unique)} unique non-zero values, likely bad data, skipping...")
                     continue
 
                 # ETF個別フロー + 合計
