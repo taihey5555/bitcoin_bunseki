@@ -387,6 +387,10 @@
 
             if (chart) chart.destroy();
 
+            // Y軸の最小値を動的に計算（データの最小値を切り下げ）
+            const minValue = Math.min(...liquidityData.map(d => d.y));
+            const yAxisMin = Math.floor(minValue);
+
             chart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -436,7 +440,7 @@
                             ticks: { color: '#888' }
                         },
                         y: {
-                            min: 5,
+                            min: yAxisMin,
                             grid: {
                                 color: 'rgba(255, 255, 255, 0.05)'
                             },
