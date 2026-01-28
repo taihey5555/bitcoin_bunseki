@@ -48,6 +48,50 @@ def dashboard():
     return render_template('dashboard_pro.html')
 
 
+@app.route('/liquidity')
+def liquidity_page():
+    """USD流動性チャートページを配信する"""
+    return render_template('liquidity.html')
+
+
+@app.route('/api/liquidity-history')
+def get_liquidity_history():
+    """過去1年分のFRED流動性データを取得"""
+    import requests
+    from datetime import timedelta
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
+
+    def fetch_fred_series(series_id):
+        url = "https://api.stlouisfed.org/fred/series/observations"
+        params = {
+            "series_id": series_id,
+            "api_key": config.FRED_API_KEY,
+            "file_type": "json",
+            "observation_start": start_date.strftime('%Y-%m-%d'),
+            "observation_end": end_date.strftime('%Y-%m-%d'),
+        }
+        try:
+            resp = requests.get(url, params=params, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                return [
+                    {"date": obs["date"], "value": float(obs["value"])}
+                    for obs in data.get("observations", [])
+                    if obs["value"] != "."
+                ]
+        except Exception as e:
+            print(f"FRED履歴取得エラー ({series_id}): {e}")
+        return []
+
+    return jsonify({
+        "walcl": fetch_fred_series("WALCL"),
+        "rrp": fetch_fred_series("RRPONTSYD"),
+        "tga": fetch_fred_series("WTREGEN"),
+    })
+
+
 @app.route('/api/data')
 def get_data():
     """ダッシュボード用のデータを取得・計算してJSONで返す"""

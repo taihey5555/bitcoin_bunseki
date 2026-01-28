@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USD流動性チャート - BTC Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%); color: #fff; min-height: 100vh; }
+
+        /* ナビゲーション（共通） */
+        .navbar {
+            background: rgba(10, 10, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+        .navbar-menu {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+        .navbar-menu a {
+            color: #aaa;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        .navbar-menu a:hover, .navbar-menu a.active {
+            color: #4facfe;
+        }
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 5px;
+        }
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: #fff;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+        .hamburger.active span:nth-child(2) { opacity: 0; }
+        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(7px, -7px); }
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            background: rgba(10, 10, 26, 0.98);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            z-index: 999;
+        }
+        .mobile-menu.active { display: block; }
+        .mobile-menu a {
+            display: block;
+            color: #aaa;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .mobile-menu a:hover, .mobile-menu a.active { color: #4facfe; }
+
+        /* ページコンテンツ */
+        .page-content {
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .page-header {
+            margin-bottom: 30px;
+        }
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .page-header p {
+            color: #888;
+            font-size: 14px;
+        }
+
+        /* カード */
+        .card {
+            background: rgba(20, 20, 40, 0.8);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #4facfe;
+            margin-bottom: 20px;
+        }
+
+        /* 現在値表示 */
+        .current-values {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .value-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .value-box .label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .value-box .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #4facfe;
+        }
+        .value-box .value.highlight {
+            color: #2ed573;
+            text-shadow: 0 0 20px rgba(46, 213, 115, 0.5);
+        }
+
+        /* チャート */
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        /* 説明 */
+        .explanation {
+            background: rgba(79, 172, 254, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .explanation h3 {
+            font-size: 14px;
+            color: #4facfe;
+            margin-bottom: 10px;
+        }
+        .explanation p {
+            font-size: 13px;
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .explanation code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #00f2fe;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #888;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .navbar-menu { display: none; }
+            .hamburger { display: flex; }
+            .page-content { padding: 15px; }
+            .page-header h1 { font-size: 22px; }
+            .chart-container { height: 300px; }
+            .current-values { grid-template-columns: 1fr 1fr; }
+            .value-box .value { font-size: 18px; }
+        }
+        @media (max-width: 480px) {
+            .current-values { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">BTC Analysis</a>
+            <ul class="navbar-menu">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/liquidity" class="active">USD流動性</a></li>
+            </ul>
+            <div class="hamburger" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="/">Dashboard</a>
+        <a href="/liquidity" class="active">USD流動性</a>
+    </div>
+
+    <div class="page-content">
+        <div class="page-header">
+            <h1>USD流動性チャート</h1>
+            <p>FRB資産 - RRP - TGA = 市場流動性</p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">現在の構成要素</div>
+            <div class="current-values">
+                <div class="value-box">
+                    <div class="label">FRBバランスシート (WALCL)</div>
+                    <div class="value" id="walcl">--</div>
+                </div>
+                <div class="value-box">
+                    <div class="label">リバースレポ (RRP)</div>
+                    <div class="value" id="rrp">--</div>
+                </div>
+                <div class="value-box">
+                    <div class="label">財務省一般勘定 (TGA)</div>
+                    <div class="value" id="tga">--</div>
+                </div>
+                <div class="value-box">
+                    <div class="label">純流動性</div>
+                    <div class="value highlight" id="liquidity">--</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">流動性推移（過去1年）</div>
+            <div class="chart-container">
+                <canvas id="liquidityChart"></canvas>
+            </div>
+            <div id="chartLoading" class="loading">チャートデータを読み込み中...</div>
+        </div>
+
+        <div class="card">
+            <div class="explanation">
+                <h3>USD流動性とは？</h3>
+                <p>USD流動性は、金融システム内で実際に利用可能な資金量を示す指標です。以下の計算式で算出されます：</p>
+                <p><code>流動性 = FRBバランスシート - RRP - TGA</code></p>
+                <p><strong>FRBバランスシート (WALCL)</strong>: 連邦準備制度の総資産。量的緩和で増加、量的引き締めで減少。</p>
+                <p><strong>リバースレポ (RRP)</strong>: 金融機関がFRBに預ける資金。これが多いと流動性は低下。</p>
+                <p><strong>財務省一般勘定 (TGA)</strong>: 政府の預金口座。支出時に流動性が市場に放出される。</p>
+                <p>流動性が高いほど、リスク資産（株式、BTC等）に資金が流れやすくなります。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleMenu() {
+            document.querySelector('.hamburger').classList.toggle('active');
+            document.getElementById('mobileMenu').classList.toggle('active');
+        }
+
+        let chart = null;
+
+        async function loadData() {
+            try {
+                // 現在値を取得
+                const currentRes = await fetch('/api/data');
+                const currentData = await currentRes.json();
+
+                // シグナルから値を探す
+                const liquiditySignal = currentData.signals?.find(s => s.name === 'USD流動性');
+                if (liquiditySignal) {
+                    document.getElementById('liquidity').textContent = liquiditySignal.value;
+                }
+
+                // 履歴データを取得
+                const historyRes = await fetch('/api/liquidity-history');
+                const historyData = await historyRes.json();
+
+                if (historyData.walcl) {
+                    const latestWalcl = historyData.walcl[historyData.walcl.length - 1];
+                    document.getElementById('walcl').textContent = `$${(latestWalcl.value / 1e6).toFixed(2)}T`;
+                }
+                if (historyData.rrp) {
+                    const latestRrp = historyData.rrp[historyData.rrp.length - 1];
+                    document.getElementById('rrp').textContent = `$${(latestRrp.value / 1e3).toFixed(0)}B`;
+                }
+                if (historyData.tga) {
+                    const latestTga = historyData.tga[historyData.tga.length - 1];
+                    document.getElementById('tga').textContent = `$${(latestTga.value / 1e6).toFixed(2)}T`;
+                }
+
+                // チャート描画
+                document.getElementById('chartLoading').style.display = 'none';
+                renderChart(historyData);
+
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('chartLoading').textContent = 'データの読み込みに失敗しました';
+            }
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('liquidityChart').getContext('2d');
+
+            // 流動性を計算（WALCL - RRP*1000 - TGA）
+            const liquidityData = [];
+            if (data.walcl && data.rrp && data.tga) {
+                const walclMap = new Map(data.walcl.map(d => [d.date, d.value]));
+                const rrpMap = new Map(data.rrp.map(d => [d.date, d.value]));
+                const tgaMap = new Map(data.tga.map(d => [d.date, d.value]));
+
+                // 全日付を取得
+                const allDates = [...new Set([
+                    ...data.walcl.map(d => d.date),
+                    ...data.rrp.map(d => d.date),
+                    ...data.tga.map(d => d.date)
+                ])].sort();
+
+                let lastWalcl = 0, lastRrp = 0, lastTga = 0;
+                allDates.forEach(date => {
+                    if (walclMap.has(date)) lastWalcl = walclMap.get(date);
+                    if (rrpMap.has(date)) lastRrp = rrpMap.get(date);
+                    if (tgaMap.has(date)) lastTga = tgaMap.get(date);
+
+                    const liquidity = lastWalcl - (lastRrp * 1000) - lastTga;
+                    liquidityData.push({ x: date, y: liquidity / 1e6 }); // 兆ドル単位
+                });
+            }
+
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'USD流動性 (兆ドル)',
+                        data: liquidityData,
+                        borderColor: '#4facfe',
+                        backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(20, 20, 40, 0.9)',
+                            titleColor: '#fff',
+                            bodyColor: '#aaa',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `$${context.parsed.y.toFixed(2)}T`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'month',
+                                displayFormats: { month: 'yyyy/MM' }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: { color: '#888' }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                callback: function(value) {
+                                    return '$' + value.toFixed(1) + 'T';
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

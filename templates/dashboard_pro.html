@@ -5,9 +5,106 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BTC Signal Dashboard</title>
     <style>
-        /* CSSは変更なし */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%); color: #fff; min-height: 100vh; padding: 30px; }
+        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%); color: #fff; min-height: 100vh; }
+
+        /* ヘッダー・ナビゲーション */
+        .navbar {
+            background: rgba(10, 10, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+        .navbar-menu {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+        .navbar-menu a {
+            color: #aaa;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s;
+            padding: 8px 0;
+        }
+        .navbar-menu a:hover, .navbar-menu a.active {
+            color: #4facfe;
+        }
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 5px;
+        }
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: #fff;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+        .hamburger.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+        .hamburger.active span:nth-child(2) {
+            opacity: 0;
+        }
+        .hamburger.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -7px);
+        }
+
+        /* モバイルメニュー */
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            background: rgba(10, 10, 26, 0.98);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            z-index: 999;
+        }
+        .mobile-menu.active {
+            display: block;
+        }
+        .mobile-menu a {
+            display: block;
+            color: #aaa;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .mobile-menu a:hover, .mobile-menu a.active {
+            color: #4facfe;
+        }
+
+        /* メインコンテンツ */
+        .page-content {
+            padding: 30px;
+        }
         .dashboard { max-width: 900px; margin: 0 auto; background: rgba(20, 20, 40, 0.8); border-radius: 24px; padding: 30px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 100px rgba(79, 172, 254, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); }
         .header { text-align: center; margin-bottom: 30px; }
         .header h1 { font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #4facfe, #00f2fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
@@ -43,7 +140,7 @@
         .signal-name { flex: 1; font-size: 14px; font-weight: 500; }
         .signal-value { font-size: 13px; color: #aaa; margin-right: 10px; }
         .signal-weight { font-size: 11px; color: #666; background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px; }
-        
+
         .summary { margin-top: 25px; padding: 20px; border-radius: 12px; transition: background 0.5s ease, border-color 0.5s ease; }
         .summary-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; transition: color 0.5s ease; }
         .summary-text { font-size: 13px; color: #ccc; line-height: 1.6; }
@@ -60,18 +157,20 @@
 
         /* レスポンシブ対応 */
         @media (max-width: 768px) {
-            body { padding: 15px; }
+            .navbar-menu { display: none; }
+            .hamburger { display: flex; }
+            .page-content { padding: 15px; }
             .dashboard { padding: 20px; border-radius: 16px; }
             .header h1 { font-size: 22px; }
             .price-display .btc-price { font-size: 32px; }
             .main-content {
                 flex-direction: column;
-                align-items: center; /* 中央揃えに */
-                gap: 40px; /* 縦積み時の間隔を調整 */
+                align-items: center;
+                gap: 40px;
             }
             .gauge-section {
-                width: 100%; /* 幅をフルに */
-                margin-bottom: 20px; /* シグナルリストとの間に余白 */
+                width: 100%;
+                margin-bottom: 20px;
             }
             .gauge-container { width: 240px; height: 160px; }
             .gauge-bg { width: 240px; height: 120px; border-radius: 120px 120px 0 0; }
@@ -84,7 +183,7 @@
         }
 
         @media (max-width: 480px) {
-            body { padding: 10px; }
+            .page-content { padding: 10px; }
             .dashboard { padding: 15px; border-radius: 12px; }
             .header h1 { font-size: 18px; }
             .price-display { padding: 15px; }
@@ -104,101 +203,127 @@
     </style>
 </head>
 <body>
-    <div class="dashboard">
-        <div class="header">
-            <h1>🎯 BTC Signal Dashboard</h1>
-            <div id="timestamp" class="subtitle">データを待っています...</div>
-        </div>
-        
-        <div class="price-display">
-            <div id="btc-price" class="btc-price">---</div>
-            <div class="price-label">Bitcoin Price (USD)</div>
-        </div>
-        
-        <div class="main-content">
-            <div class="gauge-section">
-                <div class="gauge-container">
-                    <div class="gauge-bg"></div>
-                    <div class="gauge-inner"></div>
-                    <div id="gauge-needle" class="gauge-needle"></div>
-                    <div class="gauge-center"></div>
-                </div>
-                <div class="gauge-labels">
-                    <span class="bearish">弱気</span>
-                    <span class="neutral">中立</span>
-                    <span class="bullish">強気</span>
-                </div>
-                <div class="score-display">
-                    <div id="score-value" class="score-value">--</div>
-                    <div class="score-label">総合スコア</div>
-                </div>
-            </div>
-            
-            <div class="signals-section">
-                <div class="signals-title">📊 シグナル一覧</div>
-                <div id="signals-list">
-                    <!-- シグナルはJavaScriptで動的に生成されます -->
-                </div>
+    <!-- ナビゲーションバー -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">BTC Analysis</a>
+            <ul class="navbar-menu">
+                <li><a href="/" class="active">Dashboard</a></li>
+                <li><a href="/liquidity">USD流動性</a></li>
+            </ul>
+            <div class="hamburger" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
             </div>
         </div>
-        
-        <div id="summary-container" class="summary">
-            <div id="summary-title" class="summary-title">💡 分析サマリー</div>
-            <div id="summary-text" class="summary-text">
-                データを待っています...
-            </div>
-        </div>
-        
-        <div class="analysis-logic">
-            <div class="logic-title">📖 分析ロジック</div>
-            <div class="logic-grid">
-                <div class="logic-item">
-                    <div class="logic-name">USD流動性</div>
-                    <div class="logic-desc">FRBバランスシート - RRP - TGA で算出。流動性が高いほどリスク資産に有利。</div>
-                    <div class="logic-threshold">強気: >$6.0T / 弱気: <$5.0T</div>
-                </div>
-                <div class="logic-item">
-                    <div class="logic-name">DXY（ドル指数）</div>
-                    <div class="logic-desc">ドル高はBTCに逆風、ドル安は追い風。</div>
-                    <div class="logic-threshold">強気: <100 / 弱気: >105</div>
-                </div>
-                <div class="logic-item">
-                    <div class="logic-name">Fear & Greed</div>
-                    <div class="logic-desc">市場心理の逆張り指標。恐怖時は買い、貪欲時は売りシグナル。</div>
-                    <div class="logic-threshold">強気: ≤25 (極度の恐怖) / 弱気: ≥75 (極度の貪欲)</div>
-                </div>
-                <div class="logic-item">
-                    <div class="logic-name">取引所フロー</div>
-                    <div class="logic-desc">取引所からの流出は長期保有意向、流入は売り圧力を示唆。</div>
-                    <div class="logic-threshold">強気: 純流出 >5,000 BTC / 弱気: 純流入</div>
-                </div>
-                <div class="logic-item">
-                    <div class="logic-name">Funding Rate</div>
-                    <div class="logic-desc">先物市場の過熱感を測定。高すぎは調整、低すぎは反発のサイン。</div>
-                    <div class="logic-threshold">強気: <-0.1% / 弱気: >0.1%</div>
-                </div>
-                <div class="logic-item">
-                    <div class="logic-name">Gold</div>
-                    <div class="logic-desc">安全資産としてのゴールドの動き。BTCと相関する傾向。</div>
-                    <div class="logic-threshold">変動率 ±1% 以上でシグナル</div>
-                </div>
-                <div class="logic-item">
-                    <div class="logic-name">ETFフロー</div>
-                    <div class="logic-desc">機関投資家の資金動向。純流入は需要増、純流出は売り圧力。</div>
-                    <div class="logic-threshold">強気: >$100M / 弱気: <-$100M</div>
-                </div>
-            </div>
-            <div class="logic-formula">
-                <strong>総合スコア計算:</strong> (強気シグナル重み - 弱気シグナル重み) ÷ 全シグナル数 × 100
-            </div>
-        </div>
+    </nav>
 
-        <div class="footer">
-            <span class="warning">⚠️ 投資は自己責任で</span> | t1 Analysis
+    <!-- モバイルメニュー -->
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="/" class="active">Dashboard</a>
+        <a href="/liquidity">USD流動性</a>
+    </div>
+
+    <div class="page-content">
+        <div class="dashboard">
+            <div class="header">
+                <h1>BTC Signal Dashboard</h1>
+                <div id="timestamp" class="subtitle">Loading...</div>
+            </div>
+
+            <div class="price-display">
+                <div id="btc-price" class="btc-price">---</div>
+                <div class="price-label">Bitcoin Price (USD)</div>
+            </div>
+
+            <div class="main-content">
+                <div class="gauge-section">
+                    <div class="gauge-container">
+                        <div class="gauge-bg"></div>
+                        <div class="gauge-inner"></div>
+                        <div id="gauge-needle" class="gauge-needle"></div>
+                        <div class="gauge-center"></div>
+                    </div>
+                    <div class="gauge-labels">
+                        <span class="bearish">弱気</span>
+                        <span class="neutral">中立</span>
+                        <span class="bullish">強気</span>
+                    </div>
+                    <div class="score-display">
+                        <div id="score-value" class="score-value">--</div>
+                        <div class="score-label">総合スコア</div>
+                    </div>
+                </div>
+
+                <div class="signals-section">
+                    <div class="signals-title">シグナル一覧</div>
+                    <div id="signals-list"></div>
+                </div>
+            </div>
+
+            <div id="summary-container" class="summary">
+                <div id="summary-title" class="summary-title">分析サマリー</div>
+                <div id="summary-text" class="summary-text">Loading...</div>
+            </div>
+
+            <div class="analysis-logic">
+                <div class="logic-title">分析ロジック</div>
+                <div class="logic-grid">
+                    <div class="logic-item">
+                        <div class="logic-name">USD流動性</div>
+                        <div class="logic-desc">FRBバランスシート - RRP - TGA で算出。流動性が高いほどリスク資産に有利。</div>
+                        <div class="logic-threshold">強気: >$6.0T / 弱気: <$5.0T</div>
+                    </div>
+                    <div class="logic-item">
+                        <div class="logic-name">DXY（ドル指数）</div>
+                        <div class="logic-desc">ドル高はBTCに逆風、ドル安は追い風。</div>
+                        <div class="logic-threshold">強気: <100 / 弱気: >105</div>
+                    </div>
+                    <div class="logic-item">
+                        <div class="logic-name">Fear & Greed</div>
+                        <div class="logic-desc">市場心理の逆張り指標。恐怖時は買い、貪欲時は売りシグナル。</div>
+                        <div class="logic-threshold">強気: ≤25 / 弱気: ≥75</div>
+                    </div>
+                    <div class="logic-item">
+                        <div class="logic-name">取引所フロー</div>
+                        <div class="logic-desc">取引所からの流出は長期保有意向、流入は売り圧力を示唆。</div>
+                        <div class="logic-threshold">強気: 純流出 >5,000 BTC / 弱気: 純流入</div>
+                    </div>
+                    <div class="logic-item">
+                        <div class="logic-name">Funding Rate</div>
+                        <div class="logic-desc">先物市場の過熱感を測定。高すぎは調整、低すぎは反発のサイン。</div>
+                        <div class="logic-threshold">強気: <-0.1% / 弱気: >0.1%</div>
+                    </div>
+                    <div class="logic-item">
+                        <div class="logic-name">Gold→BTC</div>
+                        <div class="logic-desc">GoldとBTCの相対強度。Goldから資金がBTCに流れる時が買いシグナル。</div>
+                        <div class="logic-threshold">強気: Gold↓ BTC↑ / 弱気: Gold↑ BTC↓</div>
+                    </div>
+                    <div class="logic-item">
+                        <div class="logic-name">ETFフロー</div>
+                        <div class="logic-desc">機関投資家の資金動向。純流入は需要増、純流出は売り圧力。</div>
+                        <div class="logic-threshold">強気: >$100M / 弱気: <-$100M</div>
+                    </div>
+                </div>
+                <div class="logic-formula">
+                    <strong>総合スコア計算:</strong> (強気シグナル重み - 弱気シグナル重み) ÷ 全シグナル数 × 100
+                </div>
+            </div>
+
+            <div class="footer">
+                <span class="warning">投資は自己責任で</span> | BTC Analysis
+            </div>
         </div>
     </div>
 
     <script>
+        // ハンバーガーメニュー制御
+        function toggleMenu() {
+            document.querySelector('.hamburger').classList.toggle('active');
+            document.getElementById('mobileMenu').classList.toggle('active');
+        }
+
         const timestampEl = document.getElementById('timestamp');
         const btcPriceEl = document.getElementById('btc-price');
         const gaugeNeedleEl = document.getElementById('gauge-needle');
@@ -208,29 +333,24 @@
         const summaryTitleEl = document.getElementById('summary-title');
         const summaryTextEl = document.getElementById('summary-text');
 
-        // スコアに応じてメーターの針の角度を計算する
         function calculateNeedleRotation(score) {
             const clampedScore = Math.max(-100, Math.min(100, score));
             return (clampedScore / 100) * 90;
         }
-        
-        // スコアに応じて色を決定する
+
         function getScoreColor(score) {
-            if (score > 30) return '#2ed573'; // bullish
-            if (score < -30) return '#ff4757'; // bearish
-            return '#ffd93d'; // neutral
+            if (score > 30) return '#2ed573';
+            if (score < -30) return '#ff4757';
+            return '#ffd93d';
         }
 
-        // ダッシュボードの表示を更新するメイン関数
         async function updateDashboard() {
-            console.log('Updating dashboard...');
             try {
                 const response = await fetch('/api/data');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
 
-                // フォールバック表示の処理
-                const summaryTitleText = data.is_fallback ? `⚠️ ${data.summary.title} (前回データ)` : data.summary.title;
+                const summaryTitleText = data.is_fallback ? `${data.summary.title} (前回データ)` : data.summary.title;
                 timestampEl.textContent = data.is_fallback ? `${data.timestamp} (前回データ)` : data.timestamp;
 
                 btcPriceEl.textContent = data.btcPrice ? `$${data.btcPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '---';
@@ -245,7 +365,6 @@
                 signalsListEl.innerHTML = '';
                 data.signals.forEach(signal => {
                     const itemWrapper = document.createElement('div');
-
                     let weightHtml = signal.weight > 1 ? `<div class="signal-weight">×${signal.weight}</div>` : '';
                     let valueClass = signal.status === 'loading' ? 'signal-value loading' : 'signal-value';
                     let itemHtml = `
@@ -256,26 +375,23 @@
                             ${weightHtml}
                         </div>
                     `;
-
-                    
                     itemWrapper.innerHTML = itemHtml;
                     signalsListEl.appendChild(itemWrapper);
                 });
 
                 summaryTitleEl.textContent = summaryTitleText;
                 summaryTextEl.textContent = data.summary.text || 'データがありません。';
-                
+
                 summaryContainerEl.style.background = `${scoreColor}1A`;
                 summaryContainerEl.style.borderColor = `${scoreColor}4D`;
                 summaryTitleEl.style.color = scoreColor;
 
             } catch (error) {
                 console.error('Failed to update dashboard:', error);
-                summaryTextEl.textContent = 'データの取得に失敗しました。サーバーが起動しているか確認してください。';
+                summaryTextEl.textContent = 'データの取得に失敗しました。';
             }
         }
 
-        // ページ読み込み完了時に実行
         document.addEventListener('DOMContentLoaded', () => {
             updateDashboard();
             setInterval(updateDashboard, 60000);
