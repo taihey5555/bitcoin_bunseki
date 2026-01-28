@@ -26,33 +26,26 @@ def scrape_etf_flow():
             sb.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             sb.sleep(5)
 
-            # 全てのテーブルを取得
-            tables = sb.find_elements('css selector', 'table')
-            print(f"Found {len(tables)} tables")
+            # ページのHTMLを取得してデバッグ
+            page_text = sb.get_page_source()
 
-            # フローデータを含むテーブルを探す（日付形式の行があるテーブル）
+            # 全ての行を取得
+            all_rows = sb.find_elements('css selector', 'table tr')
+            print(f"Found {len(all_rows)} total table rows")
+
+            # フローデータを含む行を探す（日付形式の行）
             flow_rows = []
-            for i, table in enumerate(tables):
-                rows = table.find_elements('css selector', 'tr')
-                table_text = table.text[:200] if table.text else ""
-                print(f"Table {i}: {len(rows)} rows, preview: {table_text[:100]}...")
+            for row in all_rows:
+                try:
+                    text = row.text if row.text else ""
+                    # 日付パターン(YYYY-MM-DD)で始まる行を探す
+                    if text and ('2026-' in text[:15] or '2025-' in text[:15]):
+                        print(f"Found date row: {text[:80]}...")
+                        flow_rows.append(row)
+                except:
+                    continue
 
-                # 日付パターンを含むテーブルを探す
-                if '2026-' in table.text or '2025-' in table.text:
-                    print(f"Found flow table at index {i}")
-                    flow_rows = rows
-                    break
-
-            if not flow_rows:
-                # フォールバック: 全テーブルの行を結合
-                print("Flow table not found, checking all tables...")
-                for table in tables:
-                    rows = table.find_elements('css selector', 'tr')
-                    for row in rows:
-                        if row.text and ('2026-' in row.text or '2025-' in row.text):
-                            flow_rows.append(row)
-
-            print(f"Found {len(flow_rows)} potential flow rows")
+            print(f"Found {len(flow_rows)} flow data rows")
 
             if len(flow_rows) < 1:
                 print("No flow rows found")
