@@ -96,15 +96,11 @@ def scrape_etf_flow():
                     print(f"Not enough numbers ({len(numbers)}), skipping...")
                     continue
 
-                # ETF個別フロー + 合計（日次、週次、月次）
-                # CoinGlassの構造: [ETF1, ..., ETF10, 日次合計, 週次, 月次]
-                # 最後から3番目が日次合計
-                if len(numbers) >= 13:
-                    daily_total = numbers[-3]  # 日次合計
-                    etf_values = numbers[:-3][:10]  # 最初の10個がETF
-                else:
-                    daily_total = numbers[-1]
-                    etf_values = numbers[:-1][:10]
+                # ETF個別フロー + 合計
+                # CoinGlassの構造: [ETF1, ..., ETF10, その他, 日次合計]
+                # 最後の値が日次合計（トータル）
+                daily_total = numbers[-1]
+                etf_values = numbers[:-1][:10]  # 最初の10個がETF
 
                 etf_flows = []
                 for i, name in enumerate(etf_names):
