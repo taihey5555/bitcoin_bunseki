@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arthur Scenario - BTC Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: rgba(10, 10, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .navbar-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #f7931a, #ffab40);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+        .navbar-menu {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+        .navbar-menu a {
+            color: #aaa;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        .navbar-menu a:hover, .navbar-menu a.active {
+            color: #f7931a;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .page-header {
+            margin-bottom: 30px;
+        }
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #f7931a, #ffab40);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .page-subtitle {
+            font-size: 14px;
+            color: #888;
+            line-height: 1.6;
+        }
+
+        .info-banner {
+            background: rgba(247, 147, 26, 0.1);
+            border: 1px solid rgba(247, 147, 26, 0.3);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 30px;
+        }
+        .info-banner-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #f7931a;
+            margin-bottom: 8px;
+        }
+        .info-banner-text {
+            font-size: 13px;
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        .chart-container {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-title .legend-line {
+            width: 30px;
+            height: 3px;
+            background: rgba(247, 147, 26, 0.6);
+            border-radius: 2px;
+        }
+        .chart-title .legend-text {
+            font-size: 12px;
+            color: #888;
+            font-weight: 400;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 500px;
+        }
+
+        .events-list {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .events-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .event-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .event-item:last-child {
+            border-bottom: none;
+        }
+        .event-date {
+            font-size: 14px;
+            font-weight: 600;
+            color: #f7931a;
+            min-width: 100px;
+        }
+        .event-score {
+            background: rgba(247, 147, 26, 0.2);
+            color: #f7931a;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .event-conditions {
+            font-size: 12px;
+            color: #888;
+        }
+        .event-conditions .met {
+            color: #2ed573;
+        }
+        .event-conditions .not-met {
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #888;
+        }
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(247, 147, 26, 0.2);
+            border-top-color: #f7931a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            color: #ff6b7a;
+            text-align: center;
+        }
+
+        .period-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .period-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #888;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .period-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        .period-btn.active {
+            background: rgba(247, 147, 26, 0.2);
+            border-color: rgba(247, 147, 26, 0.4);
+            color: #f7931a;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-menu { display: none; }
+            .chart-wrapper { height: 350px; }
+            .event-item { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">BTC Analysis</a>
+            <ul class="navbar-menu">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/liquidity">USD Liquidity</a></li>
+                <li><a href="/foreign-liquidity">Foreign Liquidity</a></li>
+                <li><a href="/arthur-scenario" class="active">Arthur Scenario</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Arthur Scenario Timeline</h1>
+            <p class="page-subtitle">
+                Arthur Hayes "Japanese QE Thesis" の条件が揃った局面を可視化。<br>
+                縦線は OFF→ON に転換した日付を示す（過去の振り返り用）。
+            </p>
+        </div>
+
+        <div class="info-banner">
+            <div class="info-banner-title">Arthur Scenario とは</div>
+            <div class="info-banner-text">
+                FRBが直接的なQEを行わずに、日本市場を経由してドル流動性を供給している兆候を検出する分析フレームワーク。<br>
+                4条件（FRB資産拡大、国内QE非活発、Central Bank Swaps急増、円安/介入局面）が揃うとON判定。<br>
+                <strong>注意:</strong> これは過去の条件一致を確認するためのツールであり、売買シグナルではありません。
+            </div>
+        </div>
+
+        <div class="period-selector">
+            <button class="period-btn" onclick="loadData(1)">1年</button>
+            <button class="period-btn active" onclick="loadData(3)">3年</button>
+            <button class="period-btn" onclick="loadData(5)">5年</button>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-title">
+                BTC Price with Arthur Scenario Events
+                <span class="legend-line"></span>
+                <span class="legend-text">縦線 = Arthur Scenario ON</span>
+            </div>
+            <div class="chart-wrapper">
+                <div id="loading" class="loading">
+                    <div class="loading-spinner"></div>
+                    <div>データを取得中...</div>
+                </div>
+                <canvas id="btcChart" style="display: none;"></canvas>
+                <div id="error" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div class="events-list">
+            <div class="events-title">OFF→ON 転換日（重要イベント）</div>
+            <div id="eventsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+        let currentYears = 3;
+
+        async function loadData(years) {
+            currentYears = years;
+
+            // ボタンのアクティブ状態を更新
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === `${years}年`) {
+                    btn.classList.add('active');
+                }
+            });
+
+            const loadingEl = document.getElementById('loading');
+            const chartEl = document.getElementById('btcChart');
+            const errorEl = document.getElementById('error');
+            const eventsEl = document.getElementById('eventsList');
+
+            loadingEl.style.display = 'block';
+            chartEl.style.display = 'none';
+            errorEl.style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/arthur-scenario-history?years=${years}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    errorEl.textContent = data.error;
+                    errorEl.style.display = 'block';
+                    loadingEl.style.display = 'none';
+                    return;
+                }
+
+                renderChart(data);
+                renderEventsList(data.on_transitions);
+
+                loadingEl.style.display = 'none';
+                chartEl.style.display = 'block';
+
+            } catch (err) {
+                console.error('Error loading data:', err);
+                errorEl.textContent = 'データの取得に失敗しました。';
+                errorEl.style.display = 'block';
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('btcChart').getContext('2d');
+
+            // 既存のチャートを破棄
+            if (chart) {
+                chart.destroy();
+            }
+
+            // BTC価格データ
+            const labels = data.btc_prices.map(p => p.date);
+            const prices = data.btc_prices.map(p => p.price);
+
+            // ON転換日のアノテーション
+            const annotations = {};
+            data.on_transitions.forEach((event, index) => {
+                annotations[`line${index}`] = {
+                    type: 'line',
+                    xMin: event.date,
+                    xMax: event.date,
+                    borderColor: 'rgba(247, 147, 26, 0.6)',
+                    borderWidth: 2,
+                    borderDash: [6, 4],
+                    label: {
+                        display: true,
+                        content: 'ON',
+                        position: 'start',
+                        backgroundColor: 'rgba(247, 147, 26, 0.8)',
+                        color: '#000',
+                        font: {
+                            size: 10,
+                            weight: 'bold'
+                        },
+                        padding: 4
+                    }
+                };
+            });
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'BTC Price (USD)',
+                        data: prices,
+                        borderColor: '#4facfe',
+                        backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(10, 10, 26, 0.95)',
+                            titleColor: '#fff',
+                            bodyColor: '#ccc',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `$${context.parsed.y.toLocaleString()}`;
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: annotations
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#666',
+                                maxTicksLimit: 12,
+                                callback: function(value, index) {
+                                    const date = this.getLabelForValue(value);
+                                    if (date) {
+                                        const d = new Date(date);
+                                        return `${d.getFullYear()}/${d.getMonth() + 1}`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#666',
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderEventsList(events) {
+            const eventsEl = document.getElementById('eventsList');
+
+            if (!events || events.length === 0) {
+                eventsEl.innerHTML = '<div style="color: #666; padding: 20px 0;">該当期間にON転換日はありません</div>';
+                return;
+            }
+
+            eventsEl.innerHTML = events.map(event => {
+                const cond = event.conditions;
+                const conditionsHtml = [
+                    `<span class="${cond.total_assets ? 'met' : 'not-met'}">Assets:${cond.total_assets ? '+' : '-'}</span>`,
+                    `<span class="${cond.treasury ? 'met' : 'not-met'}">Treasury:${cond.treasury ? '+' : '-'}</span>`,
+                    `<span class="${cond.swaps ? 'met' : 'not-met'}">Swaps:${cond.swaps ? '+' : '-'}</span>`,
+                    `<span class="${cond.usdjpy ? 'met' : 'not-met'}">USDJPY:${cond.usdjpy ? '+' : '-'}</span>`
+                ].join(' ');
+
+                return `
+                    <div class="event-item">
+                        <div class="event-date">${event.date}</div>
+                        <div class="event-score">${event.score}/4</div>
+                        <div class="event-conditions">${conditionsHtml}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 初期ロード
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData(3);
+        });
+    </script>
+</body>
+</html>

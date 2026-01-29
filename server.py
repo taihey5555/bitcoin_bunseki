@@ -425,6 +425,189 @@ def foreign_liquidity_page():
     return render_template('foreign_liquidity.html')
 
 
+@app.route('/arthur-scenario')
+def arthur_scenario_page():
+    """Arthur Hayes Scenario可視化ページを配信する"""
+    return render_template('arthur_scenario.html')
+
+
+@app.route('/api/arthur-scenario-history')
+def get_arthur_scenario_history():
+    """
+    過去のArthur Scenario（隠れQE）判定結果とOFF→ON転換日を取得
+
+    Returns:
+        - btc_prices: BTC価格履歴
+        - on_transitions: OFF→ON転換日（重要イベント）
+        - weekly_signals: 週次シグナル履歴
+    """
+    import requests
+    from datetime import timedelta
+
+    years = int(request.args.get('years', 3))
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=years * 365)
+
+    # FRED APIキーチェック
+    if config.FRED_API_KEY == "YOUR_FRED_API_KEY_HERE" or not config.FRED_API_KEY:
+        return jsonify({"error": "FRED APIキーが未設定です", "on_transitions": [], "btc_prices": []})
+
+    def fetch_fred_series(series_id):
+        url = "https://api.stlouisfed.org/fred/series/observations"
+        params = {
+            "series_id": series_id,
+            "api_key": config.FRED_API_KEY,
+            "file_type": "json",
+            "observation_start": start_date.strftime('%Y-%m-%d'),
+            "observation_end": end_date.strftime('%Y-%m-%d'),
+        }
+        try:
+            resp = requests.get(url, params=params, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                result = {}
+                for obs in data.get("observations", []):
+                    if obs["value"] != ".":
+                        result[obs["date"]] = float(obs["value"])
+                return result
+        except Exception as e:
+            print(f"FRED履歴取得エラー ({series_id}): {e}")
+        return {}
+
+    # FREDデータ取得
+    walcl = fetch_fred_series("WALCL")
+    swpt = fetch_fred_series("SWPT")
+    treast = fetch_fred_series("TREAST")
+
+    if not walcl or not swpt:
+        return jsonify({"error": "FREDデータ取得失敗", "on_transitions": [], "btc_prices": []})
+
+    # BTC価格履歴取得（Yahoo Finance）
+    btc_prices = []
+    try:
+        import yfinance as yf
+        btc = yf.Ticker("BTC-USD")
+        hist = btc.history(start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval="1d")
+        btc_prices = [{"date": d.strftime('%Y-%m-%d'), "price": float(row["Close"])} for d, row in hist.iterrows()]
+    except Exception as e:
+        print(f"BTC価格取得エラー: {e}")
+
+    # USDJPY履歴取得
+    usdjpy_data = {}
+    try:
+        import yfinance as yf
+        usdjpy = yf.Ticker("USDJPY=X")
+        hist = usdjpy.history(start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval="1wk")
+        prev_value = None
+        for d, row in hist.iterrows():
+            date_str = d.strftime('%Y-%m-%d')
+            value = float(row["Close"])
+            change = ((value - prev_value) / prev_value * 100) if prev_value else 0
+            usdjpy_data[date_str] = {"value": value, "change": change}
+            prev_value = value
+    except Exception as e:
+        print(f"USDJPY取得エラー: {e}")
+
+    # 週次でシグナル判定
+    dates = sorted(set(walcl.keys()) & set(swpt.keys()))
+    weekly_signals = []
+    on_transitions = []
+    prev_signal = "OFF"
+
+    # 52週分のデータでz-score計算用の統計を計算
+    swpt_values = [swpt[d] for d in sorted(swpt.keys())]
+
+    for i, date in enumerate(dates):
+        # 前週比計算
+        prev_dates = [d for d in dates if d < date]
+        prev_date = prev_dates[-1] if prev_dates else None
+
+        walcl_change = ((walcl[date] - walcl[prev_date]) / walcl[prev_date] * 100) if prev_date and prev_date in walcl else None
+        swpt_change = ((swpt[date] - swpt[prev_date]) / swpt[prev_date] * 100) if prev_date and prev_date in swpt else None
+        swpt_change_abs = (swpt[date] - swpt[prev_date]) if prev_date and prev_date in swpt else None
+        treast_change = ((treast.get(date, 0) - treast.get(prev_date, 0)) / treast.get(prev_date, 1) * 100) if prev_date and treast.get(prev_date) else None
+
+        # z-score計算（直近52週）
+        swpt_recent = swpt_values[max(0, i-52):i+1]
+        if len(swpt_recent) >= 10:
+            import statistics
+            mean_52w = statistics.mean(swpt_recent)
+            std_52w = statistics.stdev(swpt_recent) if len(swpt_recent) > 1 else 1
+            zscore = (swpt[date] - mean_52w) / std_52w if std_52w > 0 else 0
+        else:
+            zscore = 0
+
+        # 判定
+        score = 0
+        conditions = {"total_assets": False, "treasury": False, "swaps": False, "usdjpy": False}
+
+        # 条件1: Total Assets > +0.1%
+        if walcl_change is not None and walcl_change > config.TOTAL_ASSETS_INCREASE_THRESHOLD:
+            score += 1
+            conditions["total_assets"] = True
+
+        # 条件2: Treasury < +0.5%
+        if treast_change is not None and treast_change < config.TREASURY_HOLDINGS_INCREASE_THRESHOLD:
+            score += 1
+            conditions["treasury"] = True
+
+        # 条件3: Swaps急増
+        swpt_value_b = swpt[date] / 1000
+        swpt_change_abs_b = (swpt_change_abs / 1000) if swpt_change_abs else 0
+        if swpt_value_b >= config.SWAPS_MINIMUM_VALUE:
+            if swpt_change and swpt_change >= config.SWAPS_SURGE_THRESHOLD_PCT and swpt_change_abs_b >= config.SWAPS_SURGE_THRESHOLD_ABS:
+                score += 1
+                conditions["swaps"] = True
+        if zscore >= config.SWAPS_SURGE_ZSCORE_THRESHOLD:
+            if not conditions["swaps"]:
+                score += 1
+                conditions["swaps"] = True
+
+        # 条件4: USDJPY
+        usdjpy_entry = usdjpy_data.get(date) or {}
+        if usdjpy_entry:
+            usdjpy_val = usdjpy_entry.get("value", 0)
+            usdjpy_chg = usdjpy_entry.get("change", 0)
+            if usdjpy_chg >= config.USDJPY_WEAKENING_THRESHOLD:
+                score += 1
+                conditions["usdjpy"] = True
+            elif usdjpy_val >= config.USDJPY_HIGH_LEVEL and abs(usdjpy_chg) >= config.USDJPY_HIGH_VOLATILITY:
+                score += 1
+                conditions["usdjpy"] = True
+
+        # シグナル判定
+        if score >= config.HIDDEN_QE_SIGNAL_ON:
+            signal = "ON"
+        elif score >= config.HIDDEN_QE_SIGNAL_WATCH:
+            signal = "WATCH"
+        else:
+            signal = "OFF"
+
+        weekly_signals.append({
+            "date": date,
+            "signal": signal,
+            "score": score,
+            "conditions": conditions
+        })
+
+        # OFF→ON転換を検出
+        if prev_signal != "ON" and signal == "ON":
+            on_transitions.append({
+                "date": date,
+                "score": score,
+                "conditions": conditions
+            })
+
+        prev_signal = signal
+
+    return jsonify({
+        "btc_prices": btc_prices,
+        "on_transitions": on_transitions,
+        "weekly_signals": weekly_signals,
+        "period": {"start": start_date.strftime('%Y-%m-%d'), "end": end_date.strftime('%Y-%m-%d')}
+    })
+
+
 @app.route('/api/data')
 def get_data():
     """ダッシュボード用のデータを取得・計算してJSONで返す"""
