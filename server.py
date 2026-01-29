@@ -542,8 +542,8 @@ def get_arthur_scenario_history():
         # 週次でシグナル判定
         dates = sorted(set(walcl.keys()) & set(swpt.keys()))
         weekly_signals = []
-        on_transitions = []
-        prev_signal = "OFF"
+        transitions = []  # score>=2 への転換日（WATCH以上）
+        prev_score = 0  # 前週のスコアを追跡
 
         # 52週分のデータでz-score計算用の統計を計算
         swpt_values = [swpt[d] for d in sorted(swpt.keys())]
@@ -621,34 +621,58 @@ def get_arthur_scenario_history():
                     "conditions": conditions
                 })
 
-                # OFF→ON転換を検出
-                if prev_signal != "ON" and signal == "ON":
-                    on_transitions.append({
+                # OFF→WATCH以上（score>=2）への転換を検出
+                # 前週がscore<2で、今週がscore>=2の場合に記録
+                if prev_score < 2 and score >= 2:
+                    transitions.append({
                         "date": date,
                         "score": score,
+                        "signal": signal,
                         "conditions": conditions
                     })
 
-                prev_signal = signal
+                prev_score = score
 
             except Exception as e:
                 print(f"シグナル判定エラー ({date}): {e}")
                 continue
+
+        # スコア分布の統計情報を計算
+        score_distribution = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+        for sig in weekly_signals:
+            s = sig["score"]
+            if s in score_distribution:
+                score_distribution[s] += 1
+
+        stats = {
+            "total_weeks": len(weekly_signals),
+            "score_distribution": score_distribution,
+            "transitions_count": len(transitions),
+            "by_score": {
+                "score_2": len([t for t in transitions if t["score"] == 2]),
+                "score_3": len([t for t in transitions if t["score"] == 3]),
+                "score_4": len([t for t in transitions if t["score"] == 4]),
+            }
+        }
 
         # BTC価格が取得できなかった場合はエラーとして返す
         if not btc_prices:
             return jsonify({
                 "error": btc_error or "BTC価格データの取得に失敗しました。yfinanceの問題かもしれません。",
                 "btc_prices": [],
-                "on_transitions": on_transitions,
+                "transitions": transitions,
+                "on_transitions": transitions,  # 後方互換性
                 "weekly_signals": weekly_signals,
+                "stats": stats,
                 "period": {"start": start_date.strftime('%Y-%m-%d'), "end": end_date.strftime('%Y-%m-%d')}
             })
 
         return jsonify({
             "btc_prices": btc_prices,
-            "on_transitions": on_transitions,
+            "transitions": transitions,
+            "on_transitions": transitions,  # 後方互換性
             "weekly_signals": weekly_signals,
+            "stats": stats,
             "period": {"start": start_date.strftime('%Y-%m-%d'), "end": end_date.strftime('%Y-%m-%d')}
         })
 
@@ -659,9 +683,11 @@ def get_arthur_scenario_history():
         traceback.print_exc()
         return jsonify({
             "error": f"サーバーエラー: {str(e)}",
-            "on_transitions": [],
+            "transitions": [],
+            "on_transitions": [],  # 後方互換性
             "btc_prices": [],
-            "weekly_signals": []
+            "weekly_signals": [],
+            "stats": {"total_weeks": 0, "score_distribution": {}, "transitions_count": 0}
         })
 
 

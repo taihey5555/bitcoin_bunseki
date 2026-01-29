@@ -108,21 +108,37 @@
         .chart-title {
             font-size: 16px;
             font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .chart-legend {
+            display: flex;
+            gap: 20px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-        }
-        .chart-title .legend-line {
-            width: 30px;
-            height: 3px;
-            background: rgba(247, 147, 26, 0.6);
-            border-radius: 2px;
-        }
-        .chart-title .legend-text {
+            gap: 8px;
             font-size: 12px;
             color: #888;
-            font-weight: 400;
+        }
+        .legend-line {
+            width: 30px;
+            height: 3px;
+            border-radius: 2px;
+        }
+        .legend-line.score-4 {
+            background: rgba(247, 147, 26, 1);
+            height: 4px;
+        }
+        .legend-line.score-3 {
+            background: rgba(247, 147, 26, 0.6);
+            height: 3px;
+        }
+        .legend-line.score-2 {
+            background: rgba(247, 147, 26, 0.3);
+            height: 2px;
         }
         .chart-wrapper {
             position: relative;
@@ -157,12 +173,53 @@
             min-width: 100px;
         }
         .event-score {
-            background: rgba(247, 147, 26, 0.2);
-            color: #f7931a;
             padding: 4px 10px;
             border-radius: 4px;
             font-size: 12px;
             font-weight: 600;
+            min-width: 50px;
+            text-align: center;
+        }
+        .event-score.score-4 {
+            background: rgba(247, 147, 26, 0.9);
+            color: #000;
+        }
+        .event-score.score-3 {
+            background: rgba(247, 147, 26, 0.5);
+            color: #fff;
+        }
+        .event-score.score-2 {
+            background: rgba(247, 147, 26, 0.25);
+            color: #f7931a;
+        }
+        .stats-info {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+        .stats-info .stats-title {
+            font-weight: 600;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .stats-info .stats-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .stats-info .stat-item {
+            display: flex;
+            gap: 6px;
+        }
+        .stats-info .stat-label {
+            color: #666;
+        }
+        .stats-info .stat-value {
+            color: #aaa;
+            font-weight: 500;
         }
         .event-conditions {
             font-size: 12px;
@@ -274,8 +331,11 @@
         <div class="chart-container">
             <div class="chart-title">
                 BTC Price with Arthur Scenario Events
-                <span class="legend-line"></span>
-                <span class="legend-text">縦線 = Arthur Scenario ON</span>
+            </div>
+            <div class="chart-legend">
+                <span class="legend-item"><span class="legend-line score-4"></span> Score 4 (ON)</span>
+                <span class="legend-item"><span class="legend-line score-3"></span> Score 3 (WATCH)</span>
+                <span class="legend-item"><span class="legend-line score-2"></span> Score 2 (WATCH)</span>
             </div>
             <div class="chart-wrapper">
                 <div id="loading" class="loading">
@@ -288,8 +348,9 @@
         </div>
 
         <div class="events-list">
-            <div class="events-title">OFF→ON 転換日（重要イベント）</div>
+            <div class="events-title">シグナル転換日（OFF→WATCH以上）</div>
             <div id="eventsList"></div>
+            <div id="statsInfo" class="stats-info"></div>
         </div>
     </div>
 
@@ -349,7 +410,13 @@
                 }
 
                 renderChart(data);
-                renderEventsList(data.on_transitions);
+                renderEventsList(data.transitions || data.on_transitions);
+                renderStats(data.stats);
+
+                // 統計情報をコンソールに出力（デバッグ用）
+                if (data.stats) {
+                    console.log('📊 Arthur Scenario Stats:', data.stats);
+                }
                 chartEl.style.display = 'block';
 
             } catch (err) {
@@ -376,27 +443,55 @@
                 const labels = data.btc_prices.map(p => p.date);
                 const prices = data.btc_prices.map(p => p.price);
 
-            // ON転換日のアノテーション
+            // 転換日のアノテーション（scoreに応じてスタイルを変更）
             const annotations = {};
-            data.on_transitions.forEach((event, index) => {
+            const transitions = data.transitions || data.on_transitions || [];
+            transitions.forEach((event, index) => {
+                const score = event.score;
+
+                // scoreに応じたスタイル設定
+                let borderColor, borderWidth, borderDash, showLabel, labelText;
+                if (score >= 4) {
+                    // score=4: 濃い/太い線 + "ON" ラベル
+                    borderColor = 'rgba(247, 147, 26, 1)';
+                    borderWidth = 3;
+                    borderDash = [];  // 実線
+                    showLabel = true;
+                    labelText = 'ON';
+                } else if (score === 3) {
+                    // score=3: 中くらいの破線
+                    borderColor = 'rgba(247, 147, 26, 0.6)';
+                    borderWidth = 2;
+                    borderDash = [6, 4];
+                    showLabel = true;
+                    labelText = '3';
+                } else {
+                    // score=2: 薄い破線
+                    borderColor = 'rgba(247, 147, 26, 0.3)';
+                    borderWidth = 1.5;
+                    borderDash = [4, 4];
+                    showLabel = true;
+                    labelText = '2';
+                }
+
                 annotations[`line${index}`] = {
                     type: 'line',
                     xMin: event.date,
                     xMax: event.date,
-                    borderColor: 'rgba(247, 147, 26, 0.6)',
-                    borderWidth: 2,
-                    borderDash: [6, 4],
+                    borderColor: borderColor,
+                    borderWidth: borderWidth,
+                    borderDash: borderDash,
                     label: {
-                        display: true,
-                        content: 'ON',
+                        display: showLabel,
+                        content: labelText,
                         position: 'start',
-                        backgroundColor: 'rgba(247, 147, 26, 0.8)',
-                        color: '#000',
+                        backgroundColor: borderColor,
+                        color: score >= 4 ? '#000' : '#fff',
                         font: {
-                            size: 10,
-                            weight: 'bold'
+                            size: score >= 4 ? 10 : 9,
+                            weight: score >= 4 ? 'bold' : 'normal'
                         },
-                        padding: 4
+                        padding: score >= 4 ? 4 : 2
                     }
                 };
             });
@@ -488,27 +583,60 @@
             const eventsEl = document.getElementById('eventsList');
 
             if (!events || events.length === 0) {
-                eventsEl.innerHTML = '<div style="color: #666; padding: 20px 0;">該当期間にON転換日はありません</div>';
+                eventsEl.innerHTML = '<div style="color: #666; padding: 20px 0;">該当期間に転換日はありません</div>';
                 return;
             }
 
-            eventsEl.innerHTML = events.map(event => {
+            // scoreの降順でソート（重要なものを上に）
+            const sortedEvents = [...events].sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return new Date(b.date) - new Date(a.date);
+            });
+
+            eventsEl.innerHTML = sortedEvents.map(event => {
                 const cond = event.conditions;
+                const scoreClass = `score-${Math.min(event.score, 4)}`;
+                const signalLabel = event.score >= 4 ? 'ON' : 'WATCH';
+
                 const conditionsHtml = [
-                    `<span class="${cond.total_assets ? 'met' : 'not-met'}">Assets:${cond.total_assets ? '+' : '-'}</span>`,
-                    `<span class="${cond.treasury ? 'met' : 'not-met'}">Treasury:${cond.treasury ? '+' : '-'}</span>`,
-                    `<span class="${cond.swaps ? 'met' : 'not-met'}">Swaps:${cond.swaps ? '+' : '-'}</span>`,
-                    `<span class="${cond.usdjpy ? 'met' : 'not-met'}">USDJPY:${cond.usdjpy ? '+' : '-'}</span>`
+                    `<span class="${cond.total_assets ? 'met' : 'not-met'}">Assets:${cond.total_assets ? '✓' : '×'}</span>`,
+                    `<span class="${cond.treasury ? 'met' : 'not-met'}">Treasury:${cond.treasury ? '✓' : '×'}</span>`,
+                    `<span class="${cond.swaps ? 'met' : 'not-met'}">Swaps:${cond.swaps ? '✓' : '×'}</span>`,
+                    `<span class="${cond.usdjpy ? 'met' : 'not-met'}">USDJPY:${cond.usdjpy ? '✓' : '×'}</span>`
                 ].join(' ');
 
                 return `
                     <div class="event-item">
                         <div class="event-date">${event.date}</div>
-                        <div class="event-score">${event.score}/4</div>
+                        <div class="event-score ${scoreClass}">${event.score}/4 ${signalLabel}</div>
                         <div class="event-conditions">${conditionsHtml}</div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function renderStats(stats) {
+            const statsEl = document.getElementById('statsInfo');
+            if (!stats) {
+                statsEl.style.display = 'none';
+                return;
+            }
+
+            const dist = stats.score_distribution || {};
+            statsEl.innerHTML = `
+                <div class="stats-title">📊 スコア分布（週次）</div>
+                <div class="stats-row">
+                    <div class="stat-item"><span class="stat-label">Score 0:</span><span class="stat-value">${dist[0] || 0}週</span></div>
+                    <div class="stat-item"><span class="stat-label">Score 1:</span><span class="stat-value">${dist[1] || 0}週</span></div>
+                    <div class="stat-item"><span class="stat-label">Score 2:</span><span class="stat-value">${dist[2] || 0}週</span></div>
+                    <div class="stat-item"><span class="stat-label">Score 3:</span><span class="stat-value">${dist[3] || 0}週</span></div>
+                    <div class="stat-item"><span class="stat-label">Score 4:</span><span class="stat-value">${dist[4] || 0}週</span></div>
+                </div>
+                <div class="stats-row" style="margin-top: 8px;">
+                    <div class="stat-item"><span class="stat-label">総週数:</span><span class="stat-value">${stats.total_weeks}週</span></div>
+                    <div class="stat-item"><span class="stat-label">転換回数:</span><span class="stat-value">${stats.transitions_count}回</span></div>
+                </div>
+            `;
         }
 
         // 初期ロード
