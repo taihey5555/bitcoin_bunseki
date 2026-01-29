@@ -497,19 +497,28 @@ def get_arthur_scenario_history():
 
         # BTC価格履歴取得（Yahoo Finance）
         btc_prices = []
+        btc_error = None
         try:
             import yfinance as yf
+            print(f"yfinance version: {yf.__version__}")
             btc = yf.Ticker("BTC-USD")
             hist = btc.history(start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval="1d")
+            print(f"BTC履歴取得: {len(hist)}件")
             for d, row in hist.iterrows():
                 try:
                     # タイムゾーン対応: tz_localize(None)でnaiveに変換
                     date_str = d.tz_localize(None).strftime('%Y-%m-%d') if d.tzinfo else d.strftime('%Y-%m-%d')
                     btc_prices.append({"date": date_str, "price": float(row["Close"])})
-                except Exception:
-                    pass
+                except Exception as row_err:
+                    print(f"BTC行処理エラー: {row_err}")
+        except ImportError as ie:
+            btc_error = f"yfinanceがインストールされていません: {ie}"
+            print(f"BTC価格取得エラー (ImportError): {ie}")
         except Exception as e:
+            btc_error = f"BTC価格取得失敗: {e}"
             print(f"BTC価格取得エラー: {e}")
+            import traceback
+            traceback.print_exc()
 
         # USDJPY履歴取得
         usdjpy_data = {}
@@ -625,6 +634,16 @@ def get_arthur_scenario_history():
             except Exception as e:
                 print(f"シグナル判定エラー ({date}): {e}")
                 continue
+
+        # BTC価格が取得できなかった場合はエラーとして返す
+        if not btc_prices:
+            return jsonify({
+                "error": btc_error or "BTC価格データの取得に失敗しました。yfinanceの問題かもしれません。",
+                "btc_prices": [],
+                "on_transitions": on_transitions,
+                "weekly_signals": weekly_signals,
+                "period": {"start": start_date.strftime('%Y-%m-%d'), "end": end_date.strftime('%Y-%m-%d')}
+            })
 
         return jsonify({
             "btc_prices": btc_prices,
