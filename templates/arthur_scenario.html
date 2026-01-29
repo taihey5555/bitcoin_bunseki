@@ -319,40 +319,62 @@
 
             try {
                 const response = await fetch(`/api/arthur-scenario-history?years=${years}`);
-                const data = await response.json();
 
+                // HTTP非200チェック
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch (jsonErr) {
+                    throw new Error('サーバーからの応答が不正です（JSONパースエラー）');
+                }
+
+                // APIエラーチェック
                 if (data.error) {
-                    errorEl.textContent = data.error;
+                    errorEl.innerHTML = `<strong>APIエラー:</strong> ${data.error}`;
                     errorEl.style.display = 'block';
-                    loadingEl.style.display = 'none';
+                    eventsEl.innerHTML = '<div style="color: #666; padding: 20px 0;">データを取得できませんでした</div>';
+                    return;
+                }
+
+                // データが空の場合
+                if (!data.btc_prices || data.btc_prices.length === 0) {
+                    errorEl.innerHTML = '<strong>データなし:</strong> BTC価格データを取得できませんでした。しばらく待ってから再試行してください。';
+                    errorEl.style.display = 'block';
+                    eventsEl.innerHTML = '<div style="color: #666; padding: 20px 0;">データを取得できませんでした</div>';
                     return;
                 }
 
                 renderChart(data);
                 renderEventsList(data.on_transitions);
-
-                loadingEl.style.display = 'none';
                 chartEl.style.display = 'block';
 
             } catch (err) {
                 console.error('Error loading data:', err);
-                errorEl.textContent = 'データの取得に失敗しました。';
+                errorEl.innerHTML = `<strong>エラー:</strong> ${err.message || 'データの取得に失敗しました。'}`;
                 errorEl.style.display = 'block';
+                eventsEl.innerHTML = '<div style="color: #666; padding: 20px 0;">エラーが発生しました</div>';
+            } finally {
+                // 必ずローディングを解除
                 loadingEl.style.display = 'none';
             }
         }
 
         function renderChart(data) {
-            const ctx = document.getElementById('btcChart').getContext('2d');
+            try {
+                const ctx = document.getElementById('btcChart').getContext('2d');
 
-            // 既存のチャートを破棄
-            if (chart) {
-                chart.destroy();
-            }
+                // 既存のチャートを破棄
+                if (chart) {
+                    chart.destroy();
+                }
 
-            // BTC価格データ
-            const labels = data.btc_prices.map(p => p.date);
-            const prices = data.btc_prices.map(p => p.price);
+                // BTC価格データ
+                const labels = data.btc_prices.map(p => p.date);
+                const prices = data.btc_prices.map(p => p.price);
 
             // ON転換日のアノテーション
             const annotations = {};
@@ -454,6 +476,12 @@
                     }
                 }
             });
+            } catch (chartErr) {
+                console.error('Chart rendering error:', chartErr);
+                const errorEl = document.getElementById('error');
+                errorEl.innerHTML = `<strong>チャート描画エラー:</strong> ${chartErr.message}`;
+                errorEl.style.display = 'block';
+            }
         }
 
         function renderEventsList(events) {
