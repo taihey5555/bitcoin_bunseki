@@ -4,214 +4,759 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BTC Signal Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%); color: #fff; min-height: 100vh; }
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #0d1117;
+            --bg-card: rgba(13, 17, 23, 0.8);
+            --border-color: rgba(0, 255, 170, 0.15);
+            --border-glow: rgba(0, 255, 170, 0.3);
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --accent-primary: #00ffa9;
+            --accent-secondary: #00d4ff;
+            --accent-warning: #ffd93d;
+            --accent-danger: #ff6b6b;
+            --accent-btc: #f7931a;
+            --bullish: #00ffa9;
+            --bearish: #ff6b6b;
+            --neutral: #ffd93d;
+            --grid-color: rgba(0, 255, 170, 0.03);
+        }
 
-        /* ヘッダー・ナビゲーション */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Terminal Grid Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Scanline Effect */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.03) 2px,
+                rgba(0, 0, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Navigation */
         .navbar {
-            background: rgba(10, 10, 26, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 0 20px;
+            background: linear-gradient(180deg, rgba(10, 14, 20, 0.98) 0%, rgba(10, 14, 20, 0.95) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
             position: sticky;
             top: 0;
             z-index: 1000;
+            backdrop-filter: blur(20px);
         }
+
         .navbar-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 60px;
+            height: 64px;
         }
+
         .navbar-brand {
-            font-size: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
             font-weight: 700;
-            background: linear-gradient(90deg, #4facfe, #00f2fe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--accent-primary);
             text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: -0.5px;
         }
+
+        .navbar-brand::before {
+            content: '₿';
+            font-size: 22px;
+            color: var(--accent-btc);
+            text-shadow: 0 0 20px rgba(247, 147, 26, 0.5);
+        }
+
         .navbar-menu {
             display: flex;
-            gap: 30px;
+            gap: 8px;
             list-style: none;
         }
+
         .navbar-menu a {
-            color: #aaa;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
             font-weight: 500;
-            transition: color 0.3s;
-            padding: 8px 0;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid transparent;
         }
-        .navbar-menu a:hover, .navbar-menu a.active {
-            color: #4facfe;
+
+        .navbar-menu a:hover {
+            color: var(--text-primary);
+            background: rgba(0, 255, 170, 0.05);
+            border-color: var(--border-color);
         }
+
+        .navbar-menu a.active {
+            color: var(--accent-primary);
+            background: rgba(0, 255, 170, 0.1);
+            border-color: var(--border-color);
+        }
+
         .hamburger {
             display: none;
             flex-direction: column;
             cursor: pointer;
             gap: 5px;
-        }
-        .hamburger span {
-            width: 25px;
-            height: 3px;
-            background: #fff;
-            border-radius: 3px;
-            transition: all 0.3s;
-        }
-        .hamburger.active span:nth-child(1) {
-            transform: rotate(45deg) translate(5px, 5px);
-        }
-        .hamburger.active span:nth-child(2) {
-            opacity: 0;
-        }
-        .hamburger.active span:nth-child(3) {
-            transform: rotate(-45deg) translate(7px, -7px);
+            padding: 8px;
         }
 
-        /* モバイルメニュー */
+        .hamburger span {
+            width: 24px;
+            height: 2px;
+            background: var(--accent-primary);
+            border-radius: 2px;
+            transition: all 0.3s;
+        }
+
+        .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+        .hamburger.active span:nth-child(2) { opacity: 0; }
+        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
         .mobile-menu {
             display: none;
             position: fixed;
-            top: 60px;
+            top: 64px;
             left: 0;
             right: 0;
-            background: rgba(10, 10, 26, 0.98);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 20px;
+            background: rgba(10, 14, 20, 0.98);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px;
             z-index: 999;
         }
-        .mobile-menu.active {
-            display: block;
-        }
+
+        .mobile-menu.active { display: block; }
+
         .mobile-menu a {
             display: block;
-            color: #aaa;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 16px;
-            padding: 15px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .mobile-menu a:hover, .mobile-menu a.active {
-            color: #4facfe;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        /* メインコンテンツ */
+        .mobile-menu a:last-child { border-bottom: none; }
+        .mobile-menu a:hover, .mobile-menu a.active { color: var(--accent-primary); }
+
+        /* Page Content */
         .page-content {
-            padding: 30px;
+            padding: 32px 24px;
+            position: relative;
+            z-index: 1;
         }
-        .dashboard { max-width: 900px; margin: 0 auto; background: rgba(20, 20, 40, 0.8); border-radius: 24px; padding: 30px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 100px rgba(79, 172, 254, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .header { text-align: center; margin-bottom: 30px; }
-        .header h1 { font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #4facfe, #00f2fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
-        .header .subtitle { color: #888; font-size: 14px; transition: opacity 0.5s ease; }
-        .price-display { text-align: center; margin-bottom: 30px; padding: 20px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; }
-        .price-display .btc-price { font-size: 42px; font-weight: 700; color: #f7931a; text-shadow: 0 0 30px rgba(247, 147, 26, 0.5); transition: opacity 0.5s ease; }
-        .price-display .price-label { color: #888; font-size: 12px; margin-top: 5px; }
-        .main-content { display: flex; gap: 30px; align-items: flex-start; }
-        .gauge-section { flex: 1; text-align: center; }
-        .gauge-container { position: relative; width: 280px; height: 180px; margin: 0 auto; }
-        .gauge-bg { position: absolute; width: 280px; height: 140px; border-radius: 140px 140px 0 0; background: linear-gradient(90deg, #ff4757 0%, #ff6b81 20%, #ffa502 35%, #ffd93d 50%, #7bed9f 65%, #2ed573 80%, #00d2d3 100% ); overflow: hidden; }
-        .gauge-inner { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 200px; height: 100px; background: #14142a; border-radius: 100px 100px 0 0; }
-        .gauge-needle { position: absolute; bottom: 0; left: 50%; width: 4px; height: 100px; background: linear-gradient(to top, #fff, #ccc); transform-origin: bottom center; transform: translateX(-50%) rotate(0deg); border-radius: 2px; box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); transition: transform 1s cubic-bezier(0.2, 0.8, 0.2, 1); }
-        .gauge-center { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 24px; height: 24px; background: linear-gradient(135deg, #fff, #ccc); border-radius: 50%; box-shadow: 0 0 15px rgba(255, 255, 255, 0.5); }
-        .gauge-labels { display: flex; justify-content: space-between; margin-top: 10px; padding: 0 10px; }
-        .gauge-labels span { font-size: 12px; font-weight: 600; }
-        .gauge-labels .bearish { color: #ff4757; }
-        .gauge-labels .neutral { color: #ffd93d; }
-        .gauge-labels .bullish { color: #2ed573; }
-        .score-display { margin-top: 20px; }
-        .score-value { font-size: 48px; font-weight: 700; color: #ffd93d; text-shadow: 0 0 30px rgba(255, 217, 61, 0.5); transition: color 0.5s ease, text-shadow 0.5s ease; }
-        .score-label { color: #888; font-size: 14px; margin-top: 5px; }
-        .signals-section { flex: 1; }
-        .signals-title { font-size: 16px; font-weight: 600; color: #4facfe; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-        .signal-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-        .signal-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 12px; box-shadow: 0 0 10px currentColor; transition: background 0.5s ease, color 0.5s ease; }
-        .signal-dot.bullish { background: #2ed573; color: #2ed573; }
-        .signal-dot.bearish { background: #ff4757; color: #ff4757; }
-        .signal-dot.neutral { background: #ffd93d; color: #ffd93d; }
-        .signal-dot.loading { background: #4facfe; color: #4facfe; animation: pulse 1.5s ease-in-out infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .signal-value.loading { color: #4facfe; animation: pulse 1.5s ease-in-out infinite; }
-        .signal-name { flex: 1; font-size: 14px; font-weight: 500; }
-        .signal-value { font-size: 13px; color: #aaa; margin-right: 10px; }
-        .signal-weight { font-size: 11px; color: #666; background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px; }
 
-        .summary { margin-top: 25px; padding: 20px; border-radius: 12px; transition: background 0.5s ease, border-color 0.5s ease; }
-        .summary-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; transition: color 0.5s ease; }
-        .summary-text { font-size: 13px; color: #ccc; line-height: 1.6; }
-        .analysis-logic { margin-top: 30px; padding: 20px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); }
-        .logic-title { font-size: 16px; font-weight: 600; color: #4facfe; margin-bottom: 15px; }
-        .logic-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
-        .logic-item { padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 8px; border-left: 3px solid #4facfe; }
-        .logic-name { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-        .logic-desc { font-size: 11px; color: #999; line-height: 1.4; margin-bottom: 6px; }
-        .logic-threshold { font-size: 10px; color: #666; font-family: monospace; }
-        .logic-formula { margin-top: 15px; padding: 12px; background: rgba(79, 172, 254, 0.1); border-radius: 8px; font-size: 12px; color: #aaa; text-align: center; }
-        .footer { text-align: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); color: #666; font-size: 12px; }
-        .footer .warning { color: #ff6b81; }
+        .dashboard {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid var(--border-color);
+            box-shadow:
+                0 0 0 1px rgba(0, 255, 170, 0.05),
+                0 20px 60px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.02);
+        }
 
-        /* レスポンシブ対応 */
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .header h1 span {
+            color: var(--accent-primary);
+        }
+
+        .header .subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Price Display */
+        .price-display {
+            text-align: center;
+            margin-bottom: 32px;
+            padding: 24px;
+            background: linear-gradient(135deg, rgba(247, 147, 26, 0.08) 0%, rgba(247, 147, 26, 0.02) 100%);
+            border-radius: 12px;
+            border: 1px solid rgba(247, 147, 26, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .price-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-btc), transparent);
+        }
+
+        .price-display .btc-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--accent-btc);
+            text-shadow: 0 0 40px rgba(247, 147, 26, 0.4);
+            letter-spacing: -2px;
+        }
+
+        .price-display .price-label {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+            font-size: 10px;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* Main Content Layout */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        /* Gauge Section */
+        .gauge-section {
+            text-align: center;
+        }
+
+        .gauge-container {
+            position: relative;
+            width: 260px;
+            height: 160px;
+            margin: 0 auto;
+        }
+
+        .gauge-bg {
+            position: absolute;
+            width: 260px;
+            height: 130px;
+            border-radius: 130px 130px 0 0;
+            background: conic-gradient(
+                from 180deg,
+                var(--bearish) 0deg,
+                var(--neutral) 90deg,
+                var(--bullish) 180deg
+            );
+            opacity: 0.9;
+        }
+
+        .gauge-inner {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 180px;
+            height: 90px;
+            background: var(--bg-primary);
+            border-radius: 90px 90px 0 0;
+        }
+
+        .gauge-needle {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 3px;
+            height: 90px;
+            background: linear-gradient(to top, var(--text-primary), rgba(255, 255, 255, 0.6));
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(0deg);
+            border-radius: 2px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            transition: transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .gauge-center {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 20px;
+            background: var(--text-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+        }
+
+        .gauge-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            padding: 0 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .gauge-labels span {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .gauge-labels .bearish { color: var(--bearish); }
+        .gauge-labels .neutral { color: var(--neutral); }
+        .gauge-labels .bullish { color: var(--bullish); }
+
+        .score-display { margin-top: 24px; }
+
+        .score-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 56px;
+            font-weight: 700;
+            color: var(--neutral);
+            text-shadow: 0 0 40px currentColor;
+            letter-spacing: -3px;
+            transition: color 0.5s ease, text-shadow 0.5s ease;
+        }
+
+        .score-label {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+            font-size: 10px;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* Signals Section */
+        .signals-section {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .signals-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-secondary);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .signals-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--accent-secondary);
+            border-radius: 2px;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .signal-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .signal-item:last-child { border-bottom: none; }
+
+        .signal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            margin-right: 12px;
+            box-shadow: 0 0 12px currentColor;
+            transition: all 0.3s ease;
+        }
+
+        .signal-dot.bullish { background: var(--bullish); color: var(--bullish); }
+        .signal-dot.bearish { background: var(--bearish); color: var(--bearish); }
+        .signal-dot.neutral { background: var(--neutral); color: var(--neutral); }
+        .signal-dot.loading {
+            background: var(--accent-secondary);
+            color: var(--accent-secondary);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.9); }
+        }
+
+        .signal-name {
+            flex: 1;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .signal-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-right: 10px;
+        }
+
+        .signal-value.loading {
+            color: var(--accent-secondary);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .signal-weight {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 3px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Summary */
+        .summary {
+            margin-top: 28px;
+            padding: 20px;
+            border-radius: 12px;
+            background: rgba(255, 217, 61, 0.05);
+            border: 1px solid rgba(255, 217, 61, 0.2);
+            transition: all 0.5s ease;
+        }
+
+        .summary-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--neutral);
+        }
+
+        .summary-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        /* Analysis Logic */
+        .analysis-logic {
+            margin-top: 32px;
+            padding: 24px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .logic-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent-secondary);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .logic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+        }
+
+        .logic-item {
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .logic-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-left-color: var(--accent-primary);
+        }
+
+        .logic-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .logic-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .logic-threshold {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--accent-secondary);
+            background: rgba(0, 212, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .logic-formula {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(0, 255, 170, 0.05);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+            border: 1px solid rgba(0, 255, 170, 0.1);
+        }
+
+        .logic-formula strong {
+            color: var(--accent-primary);
+        }
+
+        /* Mode Toggle */
+        .mode-toggle-container {
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .mode-toggle-container > span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .mode-btn {
+            font-family: 'JetBrains Mono', monospace;
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mode-btn.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .mode-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+        }
+
+        #mode-description {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        #score-details {
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .metrics-row {
+            margin-top: 12px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .metrics-row span {
+            font-weight: 600;
+        }
+
+        #coverage-warning {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent-danger);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .footer .warning {
+            color: var(--accent-danger);
+            font-weight: 600;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
             .navbar-menu { display: none; }
             .hamburger { display: flex; }
-            .page-content { padding: 15px; }
-            .dashboard { padding: 20px; border-radius: 16px; }
+            .page-content { padding: 16px; }
+            .dashboard { padding: 20px; border-radius: 12px; }
             .header h1 { font-size: 22px; }
-            .price-display .btc-price { font-size: 32px; }
+            .price-display .btc-price { font-size: 36px; }
             .main-content {
-                flex-direction: column;
-                align-items: center;
-                gap: 40px;
+                grid-template-columns: 1fr;
+                gap: 24px;
             }
-            .gauge-section {
-                width: 100%;
-                margin-bottom: 20px;
-            }
-            .gauge-container { width: 240px; height: 160px; }
-            .gauge-bg { width: 240px; height: 120px; border-radius: 120px 120px 0 0; }
-            .gauge-inner { width: 170px; height: 85px; }
-            .gauge-needle { height: 85px; }
-            .score-value { font-size: 38px; }
-            .signals-section { width: 100%; }
+            .gauge-container { width: 220px; height: 140px; }
+            .gauge-bg { width: 220px; height: 110px; border-radius: 110px 110px 0 0; }
+            .gauge-inner { width: 150px; height: 75px; }
+            .gauge-needle { height: 75px; }
+            .score-value { font-size: 42px; }
             .logic-grid { grid-template-columns: 1fr; }
-            .logic-formula { font-size: 11px; }
         }
 
         @media (max-width: 480px) {
-            .page-content { padding: 10px; }
-            .dashboard { padding: 15px; border-radius: 12px; }
+            .page-content { padding: 12px; }
+            .dashboard { padding: 16px; }
             .header h1 { font-size: 18px; }
-            .price-display { padding: 15px; }
+            .price-display { padding: 16px; }
             .price-display .btc-price { font-size: 28px; }
-            .gauge-container { width: 200px; height: 140px; }
-            .gauge-bg { width: 200px; height: 100px; border-radius: 100px 100px 0 0; }
-            .gauge-inner { width: 140px; height: 70px; }
-            .gauge-needle { height: 70px; }
-            .score-value { font-size: 32px; }
-            .signal-item { padding: 10px 0; }
-            .signal-name { font-size: 13px; }
-            .signal-value { font-size: 12px; }
-            .summary { padding: 15px; }
-            .analysis-logic { padding: 15px; }
-            .logic-item { padding: 10px; }
+            .gauge-container { width: 180px; height: 120px; }
+            .gauge-bg { width: 180px; height: 90px; border-radius: 90px 90px 0 0; }
+            .gauge-inner { width: 120px; height: 60px; }
+            .gauge-needle { height: 60px; }
+            .score-value { font-size: 36px; }
+            .signals-section { padding: 16px; }
+            .signal-name { font-size: 12px; }
+            .analysis-logic { padding: 16px; }
+        }
+
+        /* Terminal Boot Animation */
+        @keyframes bootup {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .dashboard {
+            animation: bootup 0.6s ease-out;
         }
     </style>
 </head>
 <body>
-    <!-- ナビゲーションバー -->
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="/" class="navbar-brand">BTC Analysis</a>
+            <a href="/" class="navbar-brand">BTC_ANALYSIS</a>
             <ul class="navbar-menu">
                 <li><a href="/" class="active">Dashboard</a></li>
                 <li><a href="/liquidity">USD流動性</a></li>
                 <li><a href="/foreign-liquidity">海外流動性</a></li>
-                <li><a href="/arthur-scenario">Arthur Scenario</a></li>
+                <li><a href="/arthur-scenario">Arthur</a></li>
             </ul>
             <div class="hamburger" onclick="toggleMenu()">
                 <span></span>
@@ -221,7 +766,6 @@
         </div>
     </nav>
 
-    <!-- モバイルメニュー -->
     <div class="mobile-menu" id="mobileMenu">
         <a href="/" class="active">Dashboard</a>
         <a href="/liquidity">USD流動性</a>
@@ -232,8 +776,8 @@
     <div class="page-content">
         <div class="dashboard">
             <div class="header">
-                <h1>BTC Signal Dashboard</h1>
-                <div id="timestamp" class="subtitle">Loading...</div>
+                <h1>BTC <span>Signal</span> Dashboard</h1>
+                <div id="timestamp" class="subtitle">Initializing...</div>
             </div>
 
             <div class="price-display">
@@ -250,39 +794,39 @@
                         <div class="gauge-center"></div>
                     </div>
                     <div class="gauge-labels">
-                        <span class="bearish">弱気</span>
-                        <span class="neutral">中立</span>
-                        <span class="bullish">強気</span>
+                        <span class="bearish">BEAR</span>
+                        <span class="neutral">NEUTRAL</span>
+                        <span class="bullish">BULL</span>
                     </div>
                     <div class="score-display">
                         <div id="score-value" class="score-value">--</div>
-                        <div class="score-label">総合スコア</div>
+                        <div class="score-label">Composite Score</div>
                     </div>
                 </div>
 
                 <div class="signals-section">
-                    <div class="signals-title">シグナル一覧</div>
+                    <div class="signals-title">Signal Matrix</div>
                     <div id="signals-list"></div>
                 </div>
             </div>
 
             <div id="summary-container" class="summary">
-                <div id="summary-title" class="summary-title">分析サマリー</div>
+                <div id="summary-title" class="summary-title">Analysis Summary</div>
                 <div id="summary-text" class="summary-text">Loading...</div>
             </div>
 
             <div class="analysis-logic">
-                <div class="logic-title">分析ロジック</div>
+                <div class="logic-title">Analysis Logic</div>
                 <div class="logic-grid">
                     <div class="logic-item">
                         <div class="logic-name">USD流動性</div>
                         <div class="logic-desc">FRBバランスシート - RRP - TGA で算出。流動性が高いほどリスク資産に有利。</div>
-                        <div class="logic-threshold">強気: >$6.0T / 弱気: <$5.0T</div>
+                        <div class="logic-threshold">強気: >$6.0T / 弱気: &lt;$5.0T</div>
                     </div>
                     <div class="logic-item">
                         <div class="logic-name">DXY（ドル指数）</div>
                         <div class="logic-desc">ドル高はBTCに逆風、ドル安は追い風。</div>
-                        <div class="logic-threshold">強気: <100 / 弱気: >105</div>
+                        <div class="logic-threshold">強気: &lt;100 / 弱気: >105</div>
                     </div>
                     <div class="logic-item">
                         <div class="logic-name">Fear & Greed</div>
@@ -292,68 +836,65 @@
                     <div class="logic-item">
                         <div class="logic-name">取引所フロー</div>
                         <div class="logic-desc">取引所からの流出は長期保有意向、流入は売り圧力を示唆。</div>
-                        <div class="logic-threshold">強気: 純流出 >5,000 BTC / 弱気: 純流入</div>
+                        <div class="logic-threshold">強気: 純流出 >5,000 BTC</div>
                     </div>
                     <div class="logic-item">
                         <div class="logic-name">Funding Rate</div>
                         <div class="logic-desc">先物市場の過熱感を測定。高すぎは調整、低すぎは反発のサイン。</div>
-                        <div class="logic-threshold">強気: <-0.1% / 弱気: >0.1%</div>
+                        <div class="logic-threshold">強気: &lt;-0.1% / 弱気: >0.1%</div>
                     </div>
                     <div class="logic-item">
                         <div class="logic-name">Gold→BTC</div>
                         <div class="logic-desc">GoldとBTCの相対強度。Goldから資金がBTCに流れる時が買いシグナル。</div>
-                        <div class="logic-threshold">強気: Gold↓ BTC↑ / 弱気: Gold↑ BTC↓</div>
+                        <div class="logic-threshold">強気: Gold↓ BTC↑</div>
                     </div>
                     <div class="logic-item">
                         <div class="logic-name">ETFフロー</div>
                         <div class="logic-desc">機関投資家の資金動向。純流入は需要増、純流出は売り圧力。</div>
-                        <div class="logic-threshold">強気: >$100M / 弱気: <-$100M</div>
+                        <div class="logic-threshold">強気: >$100M / 弱気: &lt;-$100M</div>
                     </div>
-                    <div class="logic-item" style="border-left-color: #f7931a;">
+                    <div class="logic-item" style="border-left-color: var(--accent-btc);">
                         <div class="logic-name">隠れQE（Hayes Thesis）</div>
                         <div class="logic-desc">FRBが日本市場を使った隠れた量的緩和の兆候を検出。4条件：Total Assets増加、国内QE非活発、Swaps急増、円安進行。</div>
-                        <div class="logic-threshold">ON: 4/4条件 / WATCH: 2-3条件 / OFF: 0-1条件</div>
+                        <div class="logic-threshold" style="background: rgba(247, 147, 26, 0.15); color: var(--accent-btc);">ON: 4/4条件 / WATCH: 2-3条件</div>
                     </div>
                 </div>
                 <div class="logic-formula">
-                    <strong>総合スコア計算:</strong>
+                    <strong>Score:</strong>
                     <span id="score-formula-text">(強気重み - 弱気重み) ÷ アクティブ重み × 100</span>
                 </div>
-                <div class="mode-toggle-container" style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <span style="font-size: 13px; color: #888;">計算モード:</span>
-                    <div class="mode-toggle" style="display: flex; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
-                        <button id="mode-momentum" class="mode-btn active" onclick="setScoreMode('momentum')" style="padding: 6px 14px; border: none; background: #4facfe; color: #000; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s;">Momentum</button>
-                        <button id="mode-conservative" class="mode-btn" onclick="setScoreMode('conservative')" style="padding: 6px 14px; border: none; background: transparent; color: #888; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s;">Conservative</button>
+                <div class="mode-toggle-container">
+                    <span>Mode:</span>
+                    <div class="mode-toggle">
+                        <button id="mode-momentum" class="mode-btn active" onclick="setScoreMode('momentum')">Momentum</button>
+                        <button id="mode-conservative" class="mode-btn" onclick="setScoreMode('conservative')">Conservative</button>
                     </div>
-                    <span id="mode-description" style="font-size: 11px; color: #666;">中立を除外しトレンド重視</span>
+                    <span id="mode-description">中立を除外しトレンド重視</span>
                 </div>
-                <div id="score-details" class="score-details" style="margin-top: 8px; font-size: 12px; color: #888;"></div>
-                <div class="metrics-row" style="margin-top: 10px; display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: #888;">
-                    <div>信頼度: <span id="confidence-value" style="font-weight: 600; color: #4facfe;">--</span>%</div>
-                    <div>カバレッジ: <span id="coverage-value" style="font-weight: 600; color: #2ed573;">--</span>%</div>
+                <div id="score-details" class="score-details"></div>
+                <div class="metrics-row">
+                    <div>Confidence: <span id="confidence-value" style="color: var(--accent-secondary);">--</span>%</div>
+                    <div>Coverage: <span id="coverage-value" style="color: var(--bullish);">--</span>%</div>
                 </div>
-                <div id="coverage-warning" style="display: none; margin-top: 10px; padding: 10px 14px; background: rgba(255, 71, 87, 0.15); border: 1px solid rgba(255, 71, 87, 0.4); border-radius: 6px; font-size: 12px; color: #ff6b7a;">
-                    <strong>⚠️ データ欠損警告:</strong> <span id="coverage-warning-text"></span>
+                <div id="coverage-warning" style="display: none;">
+                    <strong>⚠ DATA GAP:</strong> <span id="coverage-warning-text"></span>
                 </div>
             </div>
 
             <div class="footer">
-                <span class="warning">投資は自己責任で</span> | BTC Analysis
+                <span class="warning">投資は自己責任で</span> | BTC_ANALYSIS Terminal
             </div>
         </div>
     </div>
 
     <script>
-        // ハンバーガーメニュー制御
         function toggleMenu() {
             document.querySelector('.hamburger').classList.toggle('active');
             document.getElementById('mobileMenu').classList.toggle('active');
         }
 
-        // スコア計算モード管理
         function getScoreMode() {
             let mode = localStorage.getItem('scoreCalcMode') || 'momentum';
-            // 旧モード名の移行: balance → conservative
             if (mode === 'balance') {
                 mode = 'conservative';
                 localStorage.setItem('scoreCalcMode', mode);
@@ -364,7 +905,7 @@
         function setScoreMode(mode) {
             localStorage.setItem('scoreCalcMode', mode);
             updateModeUI(mode);
-            updateDashboard(); // 新しいモードでデータを再取得
+            updateDashboard();
         }
 
         function updateModeUI(mode) {
@@ -373,18 +914,15 @@
             const modeDesc = document.getElementById('mode-description');
             const formulaText = document.getElementById('score-formula-text');
 
+            momentumBtn.classList.remove('active');
+            conservativeBtn.classList.remove('active');
+
             if (mode === 'momentum') {
-                momentumBtn.style.background = '#4facfe';
-                momentumBtn.style.color = '#000';
-                conservativeBtn.style.background = 'transparent';
-                conservativeBtn.style.color = '#888';
+                momentumBtn.classList.add('active');
                 if (modeDesc) modeDesc.textContent = '中立を除外しトレンド重視';
                 if (formulaText) formulaText.textContent = '(強気重み - 弱気重み) ÷ アクティブ重み × 100';
             } else {
-                conservativeBtn.style.background = '#ffd93d';
-                conservativeBtn.style.color = '#000';
-                momentumBtn.style.background = 'transparent';
-                momentumBtn.style.color = '#888';
+                conservativeBtn.classList.add('active');
                 if (modeDesc) modeDesc.textContent = '中立も含め慎重に評価';
                 if (formulaText) formulaText.textContent = '(強気重み - 弱気重み) ÷ 全重み × 100';
             }
@@ -405,9 +943,9 @@
         }
 
         function getScoreColor(score) {
-            if (score > 30) return '#2ed573';
-            if (score < -30) return '#ff4757';
-            return '#ffd93d';
+            if (score > 30) return 'var(--bullish)';
+            if (score < -30) return 'var(--bearish)';
+            return 'var(--neutral)';
         }
 
         async function updateDashboard() {
@@ -417,8 +955,8 @@
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
 
-                const summaryTitleText = data.is_fallback ? `${data.summary.title} (前回データ)` : data.summary.title;
-                timestampEl.textContent = data.is_fallback ? `${data.timestamp} (前回データ)` : data.timestamp;
+                const summaryTitleText = data.is_fallback ? `${data.summary.title} (CACHED)` : data.summary.title;
+                timestampEl.textContent = data.is_fallback ? `${data.timestamp} [CACHED]` : data.timestamp;
 
                 btcPriceEl.textContent = data.btcPrice ? `$${data.btcPrice.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '---';
 
@@ -427,7 +965,7 @@
                 scoreValueEl.textContent = `${score > 0 ? '+' : ''}${score}`;
                 const scoreColor = getScoreColor(score);
                 scoreValueEl.style.color = scoreColor;
-                scoreValueEl.style.textShadow = `0 0 30px ${scoreColor}80`;
+                scoreValueEl.style.textShadow = `0 0 40px ${scoreColor}`;
 
                 signalsListEl.innerHTML = '';
                 data.signals.forEach(signal => {
@@ -449,51 +987,57 @@
                 summaryTitleEl.textContent = summaryTitleText;
                 summaryTextEl.textContent = data.summary.text || 'データがありません。';
 
-                summaryContainerEl.style.background = `${scoreColor}1A`;
-                summaryContainerEl.style.borderColor = `${scoreColor}4D`;
-                summaryTitleEl.style.color = scoreColor;
+                if (score > 30) {
+                    summaryContainerEl.style.background = 'rgba(0, 255, 169, 0.05)';
+                    summaryContainerEl.style.borderColor = 'rgba(0, 255, 169, 0.2)';
+                    summaryTitleEl.style.color = 'var(--bullish)';
+                } else if (score < -30) {
+                    summaryContainerEl.style.background = 'rgba(255, 107, 107, 0.05)';
+                    summaryContainerEl.style.borderColor = 'rgba(255, 107, 107, 0.2)';
+                    summaryTitleEl.style.color = 'var(--bearish)';
+                } else {
+                    summaryContainerEl.style.background = 'rgba(255, 217, 61, 0.05)';
+                    summaryContainerEl.style.borderColor = 'rgba(255, 217, 61, 0.2)';
+                    summaryTitleEl.style.color = 'var(--neutral)';
+                }
 
-                // スコア計算詳細を表示
                 if (data.scoreDetails) {
                     const sd = data.scoreDetails;
                     const detailsEl = document.getElementById('score-details');
                     if (detailsEl) {
-                        detailsEl.innerHTML = `計算式: ${sd.formula} = <strong>${score}</strong> ｜ 強気: ${sd.bullishWeight}, 弱気: ${sd.bearishWeight}, 中立: ${sd.neutralWeight} ｜ 有効: ${sd.availableCount}/${sd.totalCount}件`;
+                        detailsEl.innerHTML = `${sd.formula} = <strong style="color: var(--accent-primary)">${score}</strong> | Bull: ${sd.bullishWeight}, Bear: ${sd.bearishWeight}, Neutral: ${sd.neutralWeight} | Active: ${sd.availableCount}/${sd.totalCount}`;
                     }
                 }
 
-                // 信頼度を表示
                 const confidenceEl = document.getElementById('confidence-value');
                 if (confidenceEl && data.confidence !== undefined) {
                     confidenceEl.textContent = data.confidence;
                     if (data.confidence >= 60) {
-                        confidenceEl.style.color = '#2ed573';
+                        confidenceEl.style.color = 'var(--bullish)';
                     } else if (data.confidence >= 40) {
-                        confidenceEl.style.color = '#ffd93d';
+                        confidenceEl.style.color = 'var(--neutral)';
                     } else {
-                        confidenceEl.style.color = '#ff4757';
+                        confidenceEl.style.color = 'var(--bearish)';
                     }
                 }
 
-                // カバレッジを表示
                 const coverageEl = document.getElementById('coverage-value');
                 const warningEl = document.getElementById('coverage-warning');
                 const warningTextEl = document.getElementById('coverage-warning-text');
                 if (coverageEl && data.coverage !== undefined) {
                     coverageEl.textContent = data.coverage;
                     if (data.coverage >= 80) {
-                        coverageEl.style.color = '#2ed573'; // 高カバレッジ: 緑
+                        coverageEl.style.color = 'var(--bullish)';
                     } else if (data.coverage >= 50) {
-                        coverageEl.style.color = '#ffd93d'; // 中カバレッジ: 黄
+                        coverageEl.style.color = 'var(--neutral)';
                     } else {
-                        coverageEl.style.color = '#ff4757'; // 低カバレッジ: 赤
+                        coverageEl.style.color = 'var(--bearish)';
                     }
 
-                    // カバレッジ80%未満で警告バナー表示
                     if (data.coverage < 80 && warningEl && warningTextEl) {
                         const unavailable = data.unavailableSignals || [];
                         const reasons = unavailable.map(s => `${s.name}(${s.reason})`).join(', ');
-                        warningTextEl.textContent = `スコア信頼度が低下しています。欠損: ${reasons}`;
+                        warningTextEl.textContent = `Score reliability degraded. Missing: ${reasons}`;
                         warningEl.style.display = 'block';
                     } else if (warningEl) {
                         warningEl.style.display = 'none';
@@ -507,7 +1051,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // 保存されたモードでUIを初期化
             updateModeUI(getScoreMode());
             updateDashboard();
             setInterval(updateDashboard, 60000);

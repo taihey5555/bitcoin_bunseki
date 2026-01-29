@@ -4,478 +4,652 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>海外流動性 / 隠れQE - BTC Analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%); color: #fff; min-height: 100vh; }
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-card: rgba(13, 17, 23, 0.8);
+            --border-color: rgba(0, 255, 170, 0.15);
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --accent-primary: #00ffa9;
+            --accent-secondary: #00d4ff;
+            --accent-btc: #f7931a;
+            --bullish: #00ffa9;
+            --bearish: #ff6b6b;
+            --neutral: #ffd93d;
+            --grid-color: rgba(0, 255, 170, 0.03);
+        }
 
-        /* ナビゲーション（共通） */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
         .navbar {
-            background: rgba(10, 10, 26, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 0 20px;
+            background: linear-gradient(180deg, rgba(10, 14, 20, 0.98) 0%, rgba(10, 14, 20, 0.95) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 24px;
             position: sticky;
             top: 0;
             z-index: 1000;
+            backdrop-filter: blur(20px);
         }
+
         .navbar-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 60px;
+            height: 64px;
         }
+
         .navbar-brand {
-            font-size: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
             font-weight: 700;
-            background: linear-gradient(90deg, #4facfe, #00f2fe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--accent-primary);
             text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+
+        .navbar-brand::before {
+            content: '₿';
+            font-size: 22px;
+            color: var(--accent-btc);
+            text-shadow: 0 0 20px rgba(247, 147, 26, 0.5);
+        }
+
         .navbar-menu {
             display: flex;
-            gap: 30px;
+            gap: 8px;
             list-style: none;
         }
+
         .navbar-menu a {
-            color: #aaa;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
             font-weight: 500;
-            transition: color 0.3s;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid transparent;
         }
-        .navbar-menu a:hover, .navbar-menu a.active {
-            color: #4facfe;
+
+        .navbar-menu a:hover {
+            color: var(--text-primary);
+            background: rgba(0, 255, 170, 0.05);
+            border-color: var(--border-color);
         }
+
+        .navbar-menu a.active {
+            color: var(--accent-btc);
+            background: rgba(247, 147, 26, 0.1);
+            border-color: rgba(247, 147, 26, 0.3);
+        }
+
         .hamburger {
             display: none;
             flex-direction: column;
             cursor: pointer;
             gap: 5px;
+            padding: 8px;
         }
+
         .hamburger span {
-            width: 25px;
-            height: 3px;
-            background: #fff;
-            border-radius: 3px;
+            width: 24px;
+            height: 2px;
+            background: var(--accent-primary);
+            border-radius: 2px;
             transition: all 0.3s;
         }
+
         .hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
         .hamburger.active span:nth-child(2) { opacity: 0; }
-        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(7px, -7px); }
+        .hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
         .mobile-menu {
             display: none;
             position: fixed;
-            top: 60px;
-            left: 0;
-            right: 0;
-            background: rgba(10, 10, 26, 0.98);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 20px;
+            top: 64px;
+            left: 0; right: 0;
+            background: rgba(10, 14, 20, 0.98);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px;
             z-index: 999;
         }
+
         .mobile-menu.active { display: block; }
+
         .mobile-menu a {
             display: block;
-            color: #aaa;
+            color: var(--text-secondary);
             text-decoration: none;
-            font-size: 16px;
-            padding: 15px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
         }
-        .mobile-menu a:hover, .mobile-menu a.active { color: #4facfe; }
 
-        /* ページコンテンツ */
+        .mobile-menu a:last-child { border-bottom: none; }
+        .mobile-menu a:hover, .mobile-menu a.active { color: var(--accent-btc); }
+
         .page-content {
-            padding: 30px;
+            padding: 32px 24px;
             max-width: 1200px;
             margin: 0 auto;
+            position: relative;
+            z-index: 1;
         }
+
         .page-header {
-            margin-bottom: 30px;
+            margin-bottom: 32px;
         }
+
         .page-header h1 {
+            font-family: 'Outfit', sans-serif;
             font-size: 28px;
-            font-weight: 700;
-            background: linear-gradient(90deg, #f7931a, #ffd93d);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-        }
-        .page-header p {
-            color: #888;
-            font-size: 14px;
-        }
-        .update-time {
-            display: inline-block;
-            margin-top: 8px;
-            padding: 4px 10px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-            font-size: 12px;
-            color: #666;
-        }
-
-        /* カード */
-        .card {
-            background: rgba(20, 20, 40, 0.8);
-            border-radius: 16px;
-            padding: 25px;
-            margin-bottom: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        }
-        .card-title {
-            font-size: 16px;
             font-weight: 600;
-            color: #f7931a;
-            margin-bottom: 20px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
         }
 
-        /* シグナル表示 */
+        .page-header h1 span {
+            color: var(--accent-btc);
+        }
+
+        .page-header p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .update-time {
+            font-family: 'JetBrains Mono', monospace;
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 0 0 1px rgba(0, 255, 170, 0.05), 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-btc);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--accent-btc);
+            border-radius: 2px;
+        }
+
+        /* Signal Display */
         .signal-display {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 20px;
-            padding: 30px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 16px;
-            margin-bottom: 15px;
+            gap: 24px;
+            padding: 32px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
         }
+
         .signal-badge {
-            padding: 12px 30px;
-            border-radius: 30px;
-            font-size: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 14px 36px;
+            border-radius: 8px;
+            font-size: 28px;
             font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 2px;
         }
+
         .signal-badge.off {
-            background: rgba(150, 150, 150, 0.2);
-            color: #999;
-            border: 2px solid #666;
+            background: rgba(100, 100, 100, 0.2);
+            color: var(--text-muted);
+            border: 2px solid var(--text-muted);
         }
+
         .signal-badge.watch {
-            background: rgba(255, 217, 61, 0.2);
-            color: #ffd93d;
-            border: 2px solid #ffd93d;
-            box-shadow: 0 0 20px rgba(255, 217, 61, 0.3);
+            background: rgba(255, 217, 61, 0.15);
+            color: var(--neutral);
+            border: 2px solid var(--neutral);
+            box-shadow: 0 0 30px rgba(255, 217, 61, 0.2);
         }
+
         .signal-badge.on {
-            background: rgba(46, 213, 115, 0.2);
-            color: #2ed573;
-            border: 2px solid #2ed573;
-            box-shadow: 0 0 30px rgba(46, 213, 115, 0.4);
+            background: rgba(0, 255, 169, 0.15);
+            color: var(--bullish);
+            border: 2px solid var(--bullish);
+            box-shadow: 0 0 40px rgba(0, 255, 169, 0.3);
             animation: pulse-glow 2s ease-in-out infinite;
         }
+
         .signal-badge.loading {
-            background: rgba(79, 172, 254, 0.2);
-            color: #4facfe;
-            border: 2px solid #4facfe;
+            background: rgba(0, 212, 255, 0.15);
+            color: var(--accent-secondary);
+            border: 2px solid var(--accent-secondary);
             animation: pulse 1.5s ease-in-out infinite;
         }
+
         @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(46, 213, 115, 0.3); }
-            50% { box-shadow: 0 0 40px rgba(46, 213, 115, 0.6); }
+            0%, 100% { box-shadow: 0 0 30px rgba(0, 255, 169, 0.2); }
+            50% { box-shadow: 0 0 50px rgba(0, 255, 169, 0.5); }
         }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+
         .signal-score {
-            font-size: 18px;
-            color: #888;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            color: var(--text-muted);
         }
+
         .signal-explanation {
             text-align: center;
-            color: #aaa;
+            color: var(--text-secondary);
             font-size: 14px;
-            margin-top: 15px;
-            line-height: 1.6;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.02);
+            line-height: 1.7;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.2);
             border-radius: 8px;
         }
 
-        /* 条件チェックリスト */
+        /* Condition List */
         .condition-list {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: 16px;
         }
+
         .condition-item {
             padding: 18px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            border-left: 4px solid #666;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            border-left: 4px solid var(--text-muted);
             transition: all 0.3s ease;
         }
+
         .condition-item.met {
-            border-left-color: #2ed573;
-            background: rgba(46, 213, 115, 0.08);
+            border-left-color: var(--bullish);
+            background: rgba(0, 255, 169, 0.05);
         }
+
         .condition-item.not-met {
-            border-left-color: #ff4757;
-            background: rgba(255, 71, 87, 0.05);
+            border-left-color: var(--bearish);
+            background: rgba(255, 107, 107, 0.03);
         }
+
         .condition-item.loading {
-            border-left-color: #4facfe;
+            border-left-color: var(--accent-secondary);
         }
+
         .condition-header {
             display: flex;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
+
         .condition-icon {
             width: 28px;
             height: 28px;
-            border-radius: 50%;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 14px;
             font-weight: bold;
             margin-right: 12px;
         }
+
         .condition-item.met .condition-icon {
-            background: rgba(46, 213, 115, 0.2);
-            color: #2ed573;
+            background: rgba(0, 255, 169, 0.2);
+            color: var(--bullish);
         }
+
         .condition-item.not-met .condition-icon {
-            background: rgba(255, 71, 87, 0.2);
-            color: #ff4757;
+            background: rgba(255, 107, 107, 0.2);
+            color: var(--bearish);
         }
+
         .condition-item.loading .condition-icon {
-            background: rgba(79, 172, 254, 0.2);
-            color: #4facfe;
+            background: rgba(0, 212, 255, 0.2);
+            color: var(--accent-secondary);
         }
+
         .condition-name {
-            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
             font-weight: 600;
-            color: #fff;
+            color: var(--text-primary);
         }
+
         .condition-details {
             margin-left: 40px;
         }
+
         .condition-current {
-            font-size: 13px;
-            color: #ccc;
-            margin-bottom: 4px;
-        }
-        .condition-threshold {
+            font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
-            color: #888;
+            color: var(--text-secondary);
             margin-bottom: 6px;
-        }
-        .condition-indicators {
-            font-size: 10px;
-            color: #f7931a;
-            margin-bottom: 6px;
-            padding: 3px 8px;
-            background: rgba(247, 147, 26, 0.1);
-            border-radius: 3px;
-            display: inline-block;
-        }
-        .condition-reason {
-            font-size: 11px;
-            color: #666;
-            padding: 6px 10px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-            font-family: 'Consolas', monospace;
         }
 
-        /* 判定ロジック説明 */
+        .condition-threshold {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .condition-indicators {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--accent-btc);
+            margin-bottom: 8px;
+            padding: 4px 10px;
+            background: rgba(247, 147, 26, 0.1);
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .condition-reason {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+        }
+
         .logic-summary {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 12px;
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-        }
-        .logic-item {
-            font-size: 12px;
-            color: #888;
-        }
-        .logic-item strong {
-            color: #f7931a;
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
         }
 
-        /* 現在値表示 */
+        .logic-item {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .logic-item strong {
+            color: var(--accent-btc);
+        }
+
+        /* Current Values */
         .current-values {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
         }
+
         .value-box {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 18px;
             text-align: center;
+            border: 1px solid var(--border-color);
         }
+
         .value-box .label {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            text-transform: uppercase;
         }
+
         .value-box .value {
+            font-family: 'JetBrains Mono', monospace;
             font-size: 20px;
             font-weight: 700;
-            color: #f7931a;
+            color: var(--accent-btc);
         }
+
         .value-box .value.loading {
-            color: #4facfe;
+            color: var(--accent-secondary);
             animation: pulse 1.5s ease-in-out infinite;
         }
+
         .value-box .change {
-            font-size: 12px;
-            margin-top: 5px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            margin-top: 6px;
         }
-        .value-box .change.positive { color: #2ed573; }
-        .value-box .change.negative { color: #ff4757; }
+
+        .value-box .change.positive { color: var(--bullish); }
+        .value-box .change.negative { color: var(--bearish); }
+
         .value-box .date {
-            font-size: 10px;
-            color: #555;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--text-muted);
             margin-top: 4px;
         }
 
-        /* チャート */
+        /* Chart */
         .chart-container {
             position: relative;
             height: 350px;
-            margin-bottom: 20px;
         }
 
-        /* 説明 */
+        /* Explanation */
         .explanation {
-            background: rgba(247, 147, 26, 0.1);
-            border-radius: 12px;
+            background: rgba(247, 147, 26, 0.05);
+            border-radius: 10px;
             padding: 20px;
-            margin-top: 20px;
-            border-left: 4px solid #f7931a;
+            border-left: 3px solid var(--accent-btc);
         }
+
         .explanation h3 {
-            font-size: 15px;
-            color: #f7931a;
-            margin-bottom: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--accent-btc);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
+
         .explanation p {
             font-size: 13px;
-            color: #aaa;
+            color: var(--text-secondary);
             line-height: 1.7;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
-        .explanation strong {
-            color: #fff;
-        }
+
+        .explanation strong { color: var(--text-primary); }
+
         .explanation code {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 2px 6px;
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 3px 8px;
             border-radius: 4px;
-            font-family: monospace;
-            color: #ffd93d;
+            color: var(--accent-primary);
+            font-size: 11px;
+        }
+
+        .quote-box {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 3px solid var(--accent-btc);
+        }
+
+        .quote-box p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+            font-style: italic;
+            margin-bottom: 12px;
+        }
+
+        .quote-box .author {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-btc);
+            font-style: normal;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: right;
+        }
+
+        .criteria-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .criteria-table th, .criteria-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+        }
+
+        .criteria-table th {
+            color: var(--accent-btc);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .criteria-table td {
+            color: var(--text-secondary);
+        }
+
+        .criteria-table code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 3px 6px;
+            border-radius: 4px;
+            color: var(--accent-primary);
         }
 
         .loading-text {
             text-align: center;
-            padding: 50px;
-            color: #888;
-        }
-
-        /* Arthur Hayes引用 */
-        .quote-box {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-            border-left: 4px solid #f7931a;
-            font-style: italic;
-        }
-        .quote-box p {
-            color: #ccc;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 10px;
-        }
-        .quote-box .author {
-            color: #f7931a;
-            font-style: normal;
-            font-weight: 600;
-            text-align: right;
-        }
-
-        /* 判定基準テーブル */
-        .criteria-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
+            padding: 60px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
-        }
-        .criteria-table th, .criteria-table td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .criteria-table th {
-            color: #f7931a;
-            font-weight: 600;
-        }
-        .criteria-table td {
-            color: #aaa;
-        }
-        .criteria-table code {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 2px 6px;
-            border-radius: 3px;
-            color: #ffd93d;
+            text-transform: uppercase;
         }
 
-        /* レスポンシブ */
         @media (max-width: 768px) {
             .navbar-menu { display: none; }
             .hamburger { display: flex; }
-            .page-content { padding: 15px; }
+            .page-content { padding: 16px; }
             .page-header h1 { font-size: 22px; }
-            .signal-display { flex-direction: column; padding: 20px; }
-            .signal-badge { font-size: 20px; padding: 10px 25px; }
+            .signal-display { flex-direction: column; padding: 24px; }
+            .signal-badge { font-size: 22px; padding: 12px 28px; }
             .condition-list { grid-template-columns: 1fr; }
             .current-values { grid-template-columns: 1fr 1fr; gap: 12px; }
-            .value-box { padding: 15px; }
-            .value-box .value { font-size: 16px; }
             .chart-container { height: 280px; }
         }
 
         @media (max-width: 480px) {
-            .page-content { padding: 10px; }
-            .card { padding: 15px; }
-            .signal-badge { font-size: 18px; padding: 8px 20px; }
-            .current-values { gap: 10px; }
-            .value-box { padding: 12px 8px; }
-            .value-box .label { font-size: 10px; }
-            .value-box .value { font-size: 14px; }
-            .chart-container { height: 250px; }
-            .condition-details { margin-left: 0; margin-top: 10px; }
+            .page-content { padding: 12px; }
+            .card { padding: 16px; }
+            .signal-badge { font-size: 18px; }
+            .value-box { padding: 14px; }
+            .value-box .value { font-size: 16px; }
+            .condition-details { margin-left: 0; margin-top: 12px; }
         }
+
+        @keyframes bootup {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .card { animation: bootup 0.6s ease-out; }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="/" class="navbar-brand">BTC Analysis</a>
+            <a href="/" class="navbar-brand">BTC_ANALYSIS</a>
             <ul class="navbar-menu">
                 <li><a href="/">Dashboard</a></li>
                 <li><a href="/liquidity">USD流動性</a></li>
                 <li><a href="/foreign-liquidity" class="active">海外流動性</a></li>
-                <li><a href="/arthur-scenario">Arthur Scenario</a></li>
+                <li><a href="/arthur-scenario">Arthur</a></li>
             </ul>
             <div class="hamburger" onclick="toggleMenu()">
                 <span></span>
@@ -494,89 +668,82 @@
 
     <div class="page-content">
         <div class="page-header">
-            <h1>海外流動性 / 隠れQE検出</h1>
+            <h1>Hidden <span>QE</span> Detection</h1>
             <p>Arthur Hayes "Japanese QE Thesis" - FRBが日本市場を使って隠れた量的緩和を行っている兆候を検出</p>
-            <div class="update-time" id="update-time">最終更新: 読み込み中...</div>
+            <div class="update-time" id="update-time">Last Update: Loading...</div>
         </div>
 
-        <!-- シグナル表示 -->
         <div class="card">
-            <div class="card-title">隠れQEシグナル</div>
+            <div class="card-title">Hidden QE Signal</div>
             <div class="signal-display">
                 <div id="signal-badge" class="signal-badge loading">...</div>
-                <div id="signal-score" class="signal-score">読み込み中...</div>
+                <div id="signal-score" class="signal-score">Loading...</div>
             </div>
-            <div id="signal-explanation" class="signal-explanation">データを取得しています。しばらくお待ちください...</div>
+            <div id="signal-explanation" class="signal-explanation">Fetching data...</div>
         </div>
 
-        <!-- 条件チェックリスト -->
         <div class="card">
-            <div class="card-title">判定条件チェック（4条件）</div>
+            <div class="card-title">Condition Check (4 Conditions)</div>
             <div class="condition-list" id="condition-list">
-                <!-- 条件1: Total Assets -->
                 <div class="condition-item loading" id="cond-total-assets">
                     <div class="condition-header">
                         <div class="condition-icon">...</div>
                         <div class="condition-name">Total Assets 増加</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-indicators" id="cond-total-assets-indicators">採用指標: 週次%</div>
-                        <div class="condition-current" id="cond-total-assets-current">読み込み中...</div>
-                        <div class="condition-threshold" id="cond-total-assets-threshold">閾値: 前週比 > +0.1%</div>
-                        <div class="condition-reason" id="cond-total-assets-reason">判定理由: 読み込み中...</div>
+                        <div class="condition-indicators" id="cond-total-assets-indicators">Metric: Weekly %</div>
+                        <div class="condition-current" id="cond-total-assets-current">Loading...</div>
+                        <div class="condition-threshold" id="cond-total-assets-threshold">Threshold: WoW > +0.1%</div>
+                        <div class="condition-reason" id="cond-total-assets-reason">Reason: Loading...</div>
                     </div>
                 </div>
-                <!-- 条件2: Treasury -->
                 <div class="condition-item loading" id="cond-treasury">
                     <div class="condition-header">
                         <div class="condition-icon">...</div>
                         <div class="condition-name">国内QE非活発</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-indicators" id="cond-treasury-indicators">採用指標: 週次%</div>
-                        <div class="condition-current" id="cond-treasury-current">読み込み中...</div>
-                        <div class="condition-threshold" id="cond-treasury-threshold">閾値: 前週比 < +0.5%</div>
-                        <div class="condition-reason" id="cond-treasury-reason">判定理由: 読み込み中...</div>
+                        <div class="condition-indicators" id="cond-treasury-indicators">Metric: Weekly %</div>
+                        <div class="condition-current" id="cond-treasury-current">Loading...</div>
+                        <div class="condition-threshold" id="cond-treasury-threshold">Threshold: WoW < +0.5%</div>
+                        <div class="condition-reason" id="cond-treasury-reason">Reason: Loading...</div>
                     </div>
                 </div>
-                <!-- 条件3: Swaps（複合条件） -->
                 <div class="condition-item loading" id="cond-swaps">
                     <div class="condition-header">
                         <div class="condition-icon">...</div>
                         <div class="condition-name">Central Bank Swaps 急増</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-indicators" id="cond-swaps-indicators">採用指標: 週次% / 増加額 / z-score</div>
-                        <div class="condition-current" id="cond-swaps-current">読み込み中...</div>
-                        <div class="condition-threshold" id="cond-swaps-threshold">閾値: 複合条件</div>
-                        <div class="condition-reason" id="cond-swaps-reason">判定理由: 読み込み中...</div>
+                        <div class="condition-indicators" id="cond-swaps-indicators">Metric: Weekly % / Abs / z-score</div>
+                        <div class="condition-current" id="cond-swaps-current">Loading...</div>
+                        <div class="condition-threshold" id="cond-swaps-threshold">Threshold: Composite</div>
+                        <div class="condition-reason" id="cond-swaps-reason">Reason: Loading...</div>
                     </div>
                 </div>
-                <!-- 条件4: USDJPY（複合条件） -->
                 <div class="condition-item loading" id="cond-usdjpy">
                     <div class="condition-header">
                         <div class="condition-icon">...</div>
                         <div class="condition-name">USDJPY 円安/介入警戒</div>
                     </div>
                     <div class="condition-details">
-                        <div class="condition-indicators" id="cond-usdjpy-indicators">採用指標: 週次% / 水準 / ボラ</div>
-                        <div class="condition-current" id="cond-usdjpy-current">読み込み中...</div>
-                        <div class="condition-threshold" id="cond-usdjpy-threshold">閾値: 複合条件</div>
-                        <div class="condition-reason" id="cond-usdjpy-reason">判定理由: 読み込み中...</div>
+                        <div class="condition-indicators" id="cond-usdjpy-indicators">Metric: Weekly % / Level / Vol</div>
+                        <div class="condition-current" id="cond-usdjpy-current">Loading...</div>
+                        <div class="condition-threshold" id="cond-usdjpy-threshold">Threshold: Composite</div>
+                        <div class="condition-reason" id="cond-usdjpy-reason">Reason: Loading...</div>
                     </div>
                 </div>
             </div>
 
             <div class="logic-summary">
-                <div class="logic-item"><strong>OFF</strong>: 0-1条件成立 (シグナルなし)</div>
-                <div class="logic-item"><strong>WATCH</strong>: 2-3条件成立 (注視)</div>
-                <div class="logic-item"><strong>ON</strong>: 4条件成立 (BTC強気)</div>
+                <div class="logic-item"><strong>OFF</strong>: 0-1 conditions (No signal)</div>
+                <div class="logic-item"><strong>WATCH</strong>: 2-3 conditions (Monitor)</div>
+                <div class="logic-item"><strong>ON</strong>: 4 conditions (BTC Bullish)</div>
             </div>
         </div>
 
-        <!-- 現在値 -->
         <div class="card">
-            <div class="card-title">FRBバランスシート構成要素</div>
+            <div class="card-title">FRB Balance Sheet Components</div>
             <div class="current-values">
                 <div class="value-box">
                     <div class="label">Total Assets (WALCL)</div>
@@ -600,27 +767,25 @@
                     <div class="label">USDJPY</div>
                     <div class="value loading" id="usdjpy-value">...</div>
                     <div class="change" id="usdjpy-change">--</div>
-                    <div class="date" id="usdjpy-date">リアルタイム</div>
+                    <div class="date" id="usdjpy-date">Realtime</div>
                 </div>
             </div>
         </div>
 
-        <!-- チャート -->
         <div class="card">
-            <div class="card-title">Central Bank Swaps 推移（過去1年）</div>
+            <div class="card-title">Central Bank Swaps Trend (1 Year)</div>
             <div class="chart-container">
                 <canvas id="swapsChart"></canvas>
             </div>
-            <div id="chartLoading" class="loading-text">チャートデータを読み込み中...</div>
+            <div id="chartLoading" class="loading-text">Loading chart...</div>
         </div>
 
-        <!-- 説明 -->
         <div class="card">
             <div class="explanation">
-                <h3>Arthur Hayes "Japanese QE Thesis" とは？</h3>
+                <h3>Arthur Hayes "Japanese QE Thesis"</h3>
                 <div class="quote-box">
                     <p>"The Fed cannot openly do QE because of inflation optics. But they can achieve the same effect through currency swaps with the BOJ, allowing Japan to intervene in FX markets while effectively injecting dollars into the global system."</p>
-                    <div class="author">- Arthur Hayes (BitMEX創設者)</div>
+                    <div class="author">- Arthur Hayes (BitMEX Founder)</div>
                 </div>
                 <p><strong>背景:</strong> FRBは公式にはQT（量的引き締め）を継続中ですが、日銀との通貨スワップを通じて、実質的なドル供給を行っている可能性があります。</p>
                 <p><strong>メカニズム:</strong></p>
@@ -629,44 +794,37 @@
                 <p>3. しかし介入後もドルは金融システム内に残留</p>
                 <p>4. 結果として、リスク資産（BTC含む）に追い風</p>
 
-                <h3 style="margin-top: 20px;">判定基準（v2: ノイズ耐性向上）</h3>
+                <h3 style="margin-top: 24px;">Judgment Criteria (v2)</h3>
                 <table class="criteria-table">
                     <tr>
-                        <th>条件</th>
-                        <th>採用指標</th>
-                        <th>閾値</th>
-                        <th>意味</th>
+                        <th>Condition</th>
+                        <th>Metric</th>
+                        <th>Threshold</th>
+                        <th>Meaning</th>
                     </tr>
                     <tr>
-                        <td>Total Assets 増加</td>
-                        <td>週次%</td>
+                        <td>Total Assets</td>
+                        <td>Weekly %</td>
                         <td><code>> +0.1%</code></td>
-                        <td>FRB資産が拡大中</td>
+                        <td>FRB assets expanding</td>
                     </tr>
                     <tr>
-                        <td>国内QE非活発</td>
-                        <td>週次%</td>
+                        <td>Domestic QE</td>
+                        <td>Weekly %</td>
                         <td><code>< +0.5%</code></td>
-                        <td>国債買入が目立たない</td>
+                        <td>Treasury buying quiet</td>
                     </tr>
                     <tr>
-                        <td>Swaps急増</td>
-                        <td>週次% / 増加額 / z-score</td>
-                        <td>
-                            <code>(週次% >= 10% & 増加額 >= 5B)</code><br>
-                            <code>または z-score >= 2.0</code><br>
-                            <span style="color:#888;font-size:10px;">※値<1Bの場合は週次%無効</span>
-                        </td>
-                        <td>ノイズ除去した急増検出</td>
+                        <td>Swaps Surge</td>
+                        <td>Weekly % / Abs / z</td>
+                        <td><code>(WoW >= 10% & Abs >= 5B) or z >= 2.0</code></td>
+                        <td>Noise-filtered surge</td>
                     </tr>
                     <tr>
-                        <td>円安/介入警戒</td>
-                        <td>週次% / 水準 / ボラ</td>
-                        <td>
-                            <code>円安: 週次 >= +1%</code><br>
-                            <code>または (>=150 & ボラ >= 1.5%)</code>
-                        </td>
-                        <td>介入筋の動きを捕捉</td>
+                        <td>JPY Weakness</td>
+                        <td>Weekly % / Level / Vol</td>
+                        <td><code>WoW >= +1% or (>=150 & Vol >= 1.5%)</code></td>
+                        <td>Intervention alert</td>
                     </tr>
                 </table>
             </div>
@@ -681,7 +839,6 @@
 
         let chart = null;
 
-        // 条件を更新する関数
         function updateCondition(condId, data) {
             const element = document.getElementById(condId);
             const iconElement = element.querySelector('.condition-icon');
@@ -690,62 +847,53 @@
             const reasonElement = document.getElementById(condId + '-reason');
             const indicatorsElement = document.getElementById(condId + '-indicators');
 
-            // データがない場合
             if (!data || data.value === null) {
                 element.className = 'condition-item not-met';
                 iconElement.textContent = '!';
-                currentElement.textContent = '現在値: データ取得失敗';
-                reasonElement.textContent = data?.reason || 'データを取得できませんでした';
+                currentElement.textContent = 'Current: Data fetch failed';
+                reasonElement.textContent = data?.reason || 'Failed to fetch data';
                 if (indicatorsElement) indicatorsElement.textContent = '';
                 return;
             }
 
-            // 条件成立/不成立に応じてスタイルを変更
             const met = data.met;
             element.className = 'condition-item ' + (met ? 'met' : 'not-met');
             iconElement.textContent = met ? '✓' : '✗';
 
-            // 採用指標表示
             if (indicatorsElement && data.indicators) {
-                indicatorsElement.textContent = `採用指標: ${data.indicators.join(' / ')}`;
+                indicatorsElement.textContent = `Metric: ${data.indicators.join(' / ')}`;
             }
 
-            // 現在値表示（条件ごとに詳細化）
             let currentText = '';
             let thresholdText = '';
 
             switch(condId) {
                 case 'cond-total-assets':
-                    currentText = `前週比: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
-                    thresholdText = `閾値: > +${data.threshold}%`;
+                    currentText = `WoW: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+                    thresholdText = `Threshold: > +${data.threshold}%`;
                     break;
                 case 'cond-treasury':
-                    currentText = `前週比: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
-                    thresholdText = `閾値: < +${data.threshold}%`;
+                    currentText = `WoW: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}%`;
+                    thresholdText = `Threshold: < +${data.threshold}%`;
                     break;
                 case 'cond-swaps':
-                    // SWPT: 複合条件の詳細表示
                     const changeAbs = data.change_abs_b !== undefined ? data.change_abs_b : 0;
                     const zscore = data.zscore !== undefined ? data.zscore : 0;
-                    currentText = `週次%: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(1)}% | 増加額: ${changeAbs >= 0 ? '+' : ''}${changeAbs?.toFixed(1)}B | z-score: ${zscore >= 0 ? '+' : ''}${zscore?.toFixed(2)}`;
-                    thresholdText = `閾値: (週次% >= ${data.threshold}% & 増加額 >= ${data.threshold_abs}B) または z-score >= ${data.threshold_zscore}`;
+                    currentText = `WoW: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(1)}% | Abs: ${changeAbs >= 0 ? '+' : ''}${changeAbs?.toFixed(1)}B | z: ${zscore >= 0 ? '+' : ''}${zscore?.toFixed(2)}`;
+                    thresholdText = `(WoW >= ${data.threshold}% & Abs >= ${data.threshold_abs}B) or z >= ${data.threshold_zscore}`;
                     break;
                 case 'cond-usdjpy':
-                    // USDJPY: 複合条件の詳細表示
                     const volatility = data.volatility !== undefined ? data.volatility : Math.abs(data.change);
-                    currentText = `水準: ${data.value?.toFixed(2)} | 週次: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}% | ボラ: ${volatility?.toFixed(2)}%`;
-                    thresholdText = `閾値: 円安 >= +${data.threshold}% または (水準 >= ${data.threshold_level} & ボラ >= ${data.threshold_volatility}%)`;
+                    currentText = `Level: ${data.value?.toFixed(2)} | WoW: ${data.change >= 0 ? '+' : ''}${data.change?.toFixed(2)}% | Vol: ${volatility?.toFixed(2)}%`;
+                    thresholdText = `WoW >= +${data.threshold}% or (Level >= ${data.threshold_level} & Vol >= ${data.threshold_volatility}%)`;
                     break;
             }
 
             currentElement.textContent = currentText;
             thresholdElement.textContent = thresholdText;
-
-            // 判定理由
-            reasonElement.textContent = data.reason || '判定中...';
+            reasonElement.textContent = data.reason || 'Evaluating...';
         }
 
-        // 値ボックスを更新する関数
         function updateValueBox(id, value, change, date, formatFn) {
             const valueEl = document.getElementById(id + '-value');
             const changeEl = document.getElementById(id + '-change');
@@ -762,7 +910,7 @@
             valueEl.className = 'value';
 
             if (change !== null && change !== undefined) {
-                changeEl.textContent = `週次 ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeEl.textContent = `WoW ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
                 changeEl.className = 'change ' + (change >= 0 ? 'positive' : 'negative');
             }
 
@@ -773,34 +921,28 @@
 
         async function loadData() {
             try {
-                // ダッシュボードAPIからシグナルデータを取得
                 const dataRes = await fetch('/api/data');
                 const data = await dataRes.json();
 
-                // 隠れQEシグナルを探す
                 const hiddenQeSignal = data.signals?.find(s => s.name === '隠れQE');
                 if (hiddenQeSignal && hiddenQeSignal.details) {
                     const qe = hiddenQeSignal.details;
 
-                    // 最終更新時刻
                     document.getElementById('update-time').textContent =
-                        `最終更新: ${qe.updated_at || data.timestamp} (自動更新: 60秒)`;
+                        `Last Update: ${qe.updated_at || data.timestamp} (Auto: 60s)`;
 
-                    // シグナルバッジ更新
                     const badge = document.getElementById('signal-badge');
                     badge.textContent = qe.signal;
                     badge.className = 'signal-badge ' + qe.signal.toLowerCase();
 
-                    document.getElementById('signal-score').textContent = `${qe.score}/4 条件成立`;
+                    document.getElementById('signal-score').textContent = `${qe.score}/4 Conditions Met`;
                     document.getElementById('signal-explanation').textContent = qe.explanation;
 
-                    // 条件チェックリスト更新
                     updateCondition('cond-total-assets', qe.details.total_assets);
                     updateCondition('cond-treasury', qe.details.treasury);
                     updateCondition('cond-swaps', qe.details.swaps);
                     updateCondition('cond-usdjpy', qe.details.usdjpy);
 
-                    // 現在値更新
                     updateValueBox('walcl', qe.details.total_assets?.value, qe.details.total_assets?.change,
                         qe.details.total_assets?.date, v => `$${(v / 1e6).toFixed(2)}T`);
                     updateValueBox('treast', qe.details.treasury?.value, qe.details.treasury?.change,
@@ -811,7 +953,6 @@
                         null, v => v.toFixed(2));
                 }
 
-                // 履歴データを取得してチャート描画
                 const historyRes = await fetch('/api/foreign-liquidity-history');
                 const historyData = await historyRes.json();
 
@@ -823,8 +964,8 @@
                 document.getElementById('signal-badge').textContent = 'ERROR';
                 document.getElementById('signal-badge').className = 'signal-badge off';
                 document.getElementById('signal-explanation').textContent =
-                    'データの読み込みに失敗しました。ページを再読み込みしてください。';
-                document.getElementById('chartLoading').textContent = 'チャートの読み込みに失敗しました';
+                    'Failed to load data. Please refresh the page.';
+                document.getElementById('chartLoading').textContent = 'Failed to load chart';
             }
         }
 
@@ -839,10 +980,10 @@
                 type: 'line',
                 data: {
                     datasets: [{
-                        label: 'Central Bank Swaps (10億ドル)',
+                        label: 'Central Bank Swaps (Billion $)',
                         data: swapsData,
                         borderColor: '#f7931a',
-                        backgroundColor: 'rgba(247, 147, 26, 0.15)',
+                        backgroundColor: 'rgba(247, 147, 26, 0.1)',
                         fill: true,
                         tension: 0.4,
                         pointRadius: 0,
@@ -857,13 +998,15 @@
                         tooltip: {
                             mode: 'index',
                             intersect: false,
-                            backgroundColor: 'rgba(20, 20, 40, 0.9)',
-                            titleColor: '#fff',
-                            bodyColor: '#aaa',
+                            backgroundColor: 'rgba(10, 14, 20, 0.95)',
+                            titleColor: '#e6edf3',
+                            titleFont: { family: 'JetBrains Mono', size: 11 },
+                            bodyColor: '#8b949e',
+                            bodyFont: { family: 'JetBrains Mono', size: 12 },
+                            borderColor: 'rgba(247, 147, 26, 0.3)',
+                            borderWidth: 1,
                             callbacks: {
-                                label: function(context) {
-                                    return `$${context.parsed.y.toFixed(1)}B`;
-                                }
+                                label: function(context) { return `$${context.parsed.y.toFixed(1)}B`; }
                             }
                         }
                     },
@@ -871,13 +1014,14 @@
                         x: {
                             type: 'time',
                             time: { unit: 'month', displayFormats: { month: 'yyyy/MM' } },
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#888' }
+                            grid: { color: 'rgba(0, 255, 170, 0.05)' },
+                            ticks: { color: '#484f58', font: { family: 'JetBrains Mono', size: 10 } }
                         },
                         y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            grid: { color: 'rgba(0, 255, 170, 0.05)' },
                             ticks: {
-                                color: '#888',
+                                color: '#484f58',
+                                font: { family: 'JetBrains Mono', size: 10 },
                                 callback: function(value) { return '$' + value.toFixed(0) + 'B'; }
                             }
                         }
@@ -886,10 +1030,7 @@
             });
         }
 
-        // 初回読み込み
         document.addEventListener('DOMContentLoaded', loadData);
-
-        // 60秒ごとに自動更新
         setInterval(loadData, 60000);
     </script>
 </body>
